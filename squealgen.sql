@@ -32,9 +32,9 @@ LANGUAGE plpgsql;
 -- now we emit all the enumerations
 
 with enumerations as (select distinct on (udt_name,enum_values)
-  'type PG' || udt_name || ' = ''PGenum ' || E'\n' || '  ''[' || enum_values || ']' as line
+  format(E'type PG%s = ''PGenum\n  ''[%s]', udt_name, enum_values) as line
 from (select col.udt_name,
-       string_agg('"' ||enu.enumlabel || '"', ', ' 
+       string_agg(format('"%s"', enu.enumLabel), ', ' 
                   order by enu.enumsortorder) as enum_values
 from information_schema.columns col
 join information_schema.tables tab on tab.table_schema = col.table_schema
@@ -58,29 +58,27 @@ select string_agg(enumerations.line, E'\n') as enums	from enumerations \gset
 
 with   mytables as (SELECT tables.*,
                          initcap(tables.table_name) as cappedName,
-			 E'\n' || '  ''[' || string_agg(mycolumns.colDef, E'\n' || '  ,') || ']' as haskCols,
-			 '[]'::text as constraintCols,
-			 array_agg(mycolumns.colDef) as columns
---                         json_object_agg (mycolumns.column_name, mycolumns.*) as columns
+			 
+			 format(E'\n  ''[%s]',string_agg(mycolumns.colDef, E'\n  ,')) as haskCols,
+			 format(E'\n  ''[%s]',string_agg(mycolumns.constraintDefs, E'\n  ,')) as constraintCols
 FROM (select columns.*,
-           ('"' || column_name || '"' || ' ::: ' || case when column_default is null then '''Def'    else '''NoDef' end ||
-           ' :=> ' ||
+            format('"%s" ::: %s :=> %s %s',
+	      column_name, 
+	      case when column_default is null then '''Def'    else '''NoDef' end,
 	      (case is_nullable
 	         when 'YES' then '''Null'
 	         when  'NO' then '''NotNull'
---   	         else (1/0) :: text
 	         else croak ('is_nullable broken somehow: ' || is_nullable)
-		 end )	
+		 end ),
 		 
-	   -- mildly tricky: standard postgresql datatypes need a tick, usergen types don't. HOWEVER! if we leave them off, we just
-	   -- get warnings, so this might be something to fix later.
-	   || ' '
-	   || (case 
-	      -- this won't work for everything - should check if it's got a max length.
-	        when udt_name = 'varchar' then 'PGtext'
-                else ('PG' || (udt_name :: text))
-		end))
-		as colDef
+                 -- mildly tricky: standard postgresql datatypes need a tick, usergen types don't. HOWEVER! if we leave them off, we just
+		 -- get warnings, so this might be something to fix later.
+		 (case 
+		 	      -- this won't work for everything - should check if it's got a max length.
+                    when udt_name = 'varchar' then 'PGtext'
+                    else ('PG' || (udt_name :: text))
+	  	    end)) as colDef,
+	   ('[]'::text) as constraintDefs
   from columns) mycolumns
 join tables on mycolumns.table_name = tables.table_name
 WHERE table_type = 'BASE TABLE'
@@ -97,9 +95,9 @@ group by tables.table_catalog,
 	 tables.is_insertable_into,
 	 tables.is_typed,
 	 tables.commit_action)
-select string_agg('type ' || mytables.cappedName || 'Columns = ' || mytables.haskCols, E'\n') as cols,
-       string_agg('type ' || mytables.cappedName || 'Constraints = ''' || mytables.constraintCols, E'\n') as straints,
-       string_agg('type ' || mytables.cappedName || 'Table = ' || mytables.cappedName || 'Constraints :=> ' || mytables.cappedName || 'Columns', E'\n') as tabs
+select string_agg(format('type %sColumns = %s', mytables.cappedName, mytables.haskCols), E'\n') as cols,
+       string_agg(format('type %sConstraints = %s', mytables.cappedName, mytables.constraintCols), E'\n') as straints,
+       string_agg(format('type %sTable = %sConstraints :=> %sColumns', mytables.cappedName, mytables.cappedName, mytables.cappedName), E'\n') as tabs
 from mytables \gset
 
 \echo :cols
