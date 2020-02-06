@@ -44,7 +44,7 @@ join information_schema.tables tab on tab.table_schema = col.table_schema
                                    and tab.table_type = 'BASE TABLE'
 join pg_type typ on col.udt_name = typ.typname
 join pg_enum enu on typ.oid = enu.enumtypid
-where col.table_schema = :'chosen_schema' --  not in ('information_schema', 'pg_catalog')
+where col.table_schema = :'chosen_schema'
       and typ.typtype = 'e'
 group by col.table_schema,
          col.table_name,
@@ -62,10 +62,8 @@ from enumerations \gset
 \echo :decl
 
 with   mytables as (SELECT tables.*,
---                         initcap(tables.table_name) as cappedName,
 			 replace(initcap(replace(tables.table_name, '_', ' ')), ' ', '') as cappedName,
 			 format(E'\n  ''[%s]',string_agg(mycolumns.colDef, E'\n  ,')) as haskCols
---			 format(E'\n  ''[%s] -- %s',string_agg(distinct table_constraints.constraint_defs, E'\n\n  ,'),string_agg(table_constraints.orig_table_name, ',')) as constraintCols
 FROM tables
 join (select columns.*,
             format('"%s" ::: %s :=> %s %s',
@@ -147,7 +145,7 @@ from mytables \gset
 -- this is a bit hacky. maybe nulls? anyway.
 \pset recordsep '||||'
 -- display all the data from all the tables
-\d public.*
+\d :chosen_schema.*
 -- couldn't make this work - accessing the individual components of a foreign key seems very hard.
 
 -- left join (

@@ -39,13 +39,14 @@ real schema = do
   -- (`mapM` (Map.toList indices)) $ \x ->
   --   putStrLn ("-- " <> show x)
 
-  putStrLn . T.unpack $ "type Schema = '[" <> T.intercalate "\n  ," (map (\t -> tshow t <> "::: 'Table " <> textPascal t <> "Table" )  (Map.keys indices)) <> "]"
 
-  mapM (putStrLn . T.unpack . processTableChunk (`Map.lookup` indices)) tables
+  let (tableNames, definedTables) = unzip $ map (processTableChunk schema (`Map.lookup` indices)) tables
+  putStrLn . T.unpack $ "type Schema = '[" <> T.intercalate "\n  ," (map (\t -> tshow t <> "::: 'Table " <> textPascal t <> "Table" )  tableNames) <> "]"
+  mapM (putStrLn . T.unpack) definedTables
 
-processTableChunk indices s = --
+processTableChunk schema indices s = --
   let (tablenameComp:tablecomponents) = T.splitOn "||||" s
-      tablename = fromJust $ T.stripPrefix "public." $ fromJust $ T.stripSuffix "\"" $ fromJust $ T.stripPrefix "Table \"" tablenameComp
+      tablename = fromJust $ T.stripPrefix (schema <> ".") $ fromJust $ T.stripSuffix "\"" $ fromJust $ T.stripPrefix "Table \"" tablenameComp
       meat = dropWhile (not . T.isSuffixOf ":") tablecomponents
 
       getChunks :: [Text] -> [Maybe Text] -- (Text,[Text])]
@@ -80,13 +81,13 @@ processTableChunk indices s = --
         (key:"FOREIGN":"KEY":keys:"REFERENCES":targets:_) ->
           let hkeys = stripList keys
 
-              (targetTable, targetFields) = T.span (/='(') . fromJust . T.stripPrefix "public." $ targets
+              (targetTable, targetFields) = T.span (/='(') . fromJust . T.stripPrefix (schema <> ".") $ targets
           in
           key <> " ::: 'ForeignKey '" <>  tshow hkeys <> " " <> tshow targetTable <> " '" <> tshow (stripList targetFields)
         x -> T.unlines ["error!!!:",tablename,tshow x,s]
 
-  in "type " <> textPascal tablename <> "Constraints = '[\n  "
-     <> T.intercalate "\n  ," (catMaybes $ (indices tablename:getChunks meat)) <> "]"
+  in (tablename,  "type " <> textPascal tablename <> "Constraints = '[\n  "
+     <> T.intercalate "\n  ," (catMaybes $ (indices tablename:getChunks meat)) <> "]")
 
 
 --  in T.unlines $ ["begin"] <> (tablename:meat) <> ["end"]
