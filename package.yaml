@@ -22,6 +22,15 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base >= 4.7 && < 5
 
+executables:
+  genConstraints:
+    main: genConstraints.hs
+    source-dirs: app
+    dependencies:
+    - text
+    - casing
+    - containers
+    
 library:
   source-dirs: src
   dependencies:
