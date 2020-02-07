@@ -4,7 +4,7 @@ Generate squeal types from a running database.
 
 ## why?
 
-Squeal is a lovely way to interact with a database, but setting up the initial schema is a struggle.
+[Squeal](https://hackage.haskell.org/package/squeal-postgresql) is a lovely way to interact with a database, but setting up the initial schema is a struggle.
 By default, it assumes you will be managing and migrating your database with Squeal, and if you are starting 
 from scratch, that works great, but if you're managing it some other way, or even just want to test out Squeal
 on an existing database, it's tedious to have to set up the database types and keep them up to date.
