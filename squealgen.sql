@@ -240,3 +240,19 @@ from mytables \gset
 -- group by flat_constraints.orig_table_name
 
 -- ) table_constraints on table_constraints.orig_table_name=tables.table_name
+
+
+-- some interim evil hacking
+-- select regexp_split_to_array(trim(both '()'
+--                                   from replace(fk, ' ','')),',') as fk,
+--        split_part(target, '(', 1) as tab,
+--        regexp_split_to_array(split_part(target, '(', 2)::text, E', '::text) as reffields
+-- from
+--   (select split_part(split_part(condef, 'FOREIGN KEY ', 2), 'REFERENCES', 1) as fk,
+--           split_part(split_part(condef, 'REFERENCES ', 2), ')', 1) as target
+--    from
+--      (SELECT conname,
+--              pg_catalog.pg_get_constraintdef(r.oid, true) as condef
+--       FROM pg_catalog.pg_constraint r
+--       WHERE r.contype = 'f'
+--       ORDER BY 1) def) def2;
