@@ -12,11 +12,10 @@ on an existing database, it's tedious to have to set up the database types and k
 ## how?
 
 1. clone the repo and change into the directory
-2. run this, editing the chosen_schema, modulename values, and redirection to suit your project.
-
-```
-psql yourdatabase -v chosen_schema=public -v modulename=Schema < squealgen.sql > /your/project/dir/src/Schema.hs
-```
+2. `make prefix=$HOME/.local install`. (We will assume here that `$HOME/.local/bin` is in your path, obviously
+feel free to install wherever makes sense to you.)
+2. If my database is `cooldb`, my haskell module file is `Schema.hs`, and i want to use the `public` schema (the default),
+I would run `squealgen cooldb Schema public > ~/myproject/src/Schema.hs`.
 
 You could integrate this in various ways: perhaps just as an initial scaffold, or perhaps integrated as part
 of your build process. A true madman could integrate this into a TH call, but I suspect this would be slow and
