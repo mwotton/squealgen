@@ -4,7 +4,7 @@
 set search_path to information_schema,:chosen_schema;
 \echo -- | This code was originally created by squealgen. Edit if you know how it got made and are willing to own it now.
 
-create or replace function croak(message text) returns text as $$
+create or replace function pg_temp.croak(message text) returns text as $$
 begin
   raise 'Croaked: %', message;
 end;
@@ -65,7 +65,7 @@ join (select columns.*,
 	      (case is_nullable
 	         when 'YES' then '''Null'
 	         when  'NO' then '''NotNull'
-	         else croak ('is_nullable broken somehow: ' || is_nullable)
+	         else pg_temp.croak ('is_nullable broken somehow: ' || is_nullable)
 		 end ),
 
                  -- mildly tricky: standard postgresql datatypes need a tick, usergen types don't. HOWEVER! if we leave them off, we just
@@ -140,7 +140,7 @@ join (select table_name,
 	       case contype
 	       when 'p' then format('''PrimaryKey ''["%s"]', array_to_string(pkeys, '","'))
 	       when 'f' then format('''ForeignKey ''["%s"] "%s" ''["%s"]', array_to_string(fk,'","'), tab, array_to_string(reffields, '","'))
-	       else croak (format('bad type %s',contype))
+	       else pg_temp.croak (format('bad type %s',contype))
 	       end)
 			, E'\n  ,') as str
 from constraintDefs  group by table_name) cd on cd.table_name = defs.table_name
