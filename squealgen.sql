@@ -11,6 +11,13 @@ end;
 $$
 LANGUAGE plpgsql;
 
+create or replace function pg_temp.initCaps(message text) returns text as $$
+begin
+ return replace(initcap(replace(message, '_', ' ')), ' ', '');
+end;
+$$
+LANGUAGE plpgsql;
+
 -- PRAGMAS of DOOM
 \echo {-# LANGUAGE DataKinds #-}
 \echo {-# LANGUAGE DeriveGeneric #-}
@@ -21,6 +28,7 @@ LANGUAGE plpgsql;
 \echo {-# LANGUAGE TypeApplications #-}
 \echo {-# LANGUAGE TypeOperators #-}
 \echo {-# LANGUAGE GADTs #-}
+\echo {-# OPTIONS_GHC -fno-warn-unticked-promoted-constructors #-}
 \echo
 \echo module :modulename where
 \echo import Squeal.PostgreSQL
@@ -34,7 +42,7 @@ select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
 \echo
 \echo :db
 \echo
-\echo type Schema = Join Tables Enums
+\echo type Schema = Join (Join Tables Enums) Views
 
 -- now we emit all the enumerations
 with enumerations as  (select
@@ -149,3 +157,30 @@ group by cd.table_name) allDefs \gset
 \echo :schem
 \echo
 \echo :defs
+
+\echo -- VIEWS
+
+
+create temporary view my_views as (
+SELECT
+  string_agg(format(E'"%s" ::: ''%s ''PG%s',
+    a.attname,
+    case when a.attnotnull
+      then 'NotNull'
+      else 'Null'
+    end,
+    t.typname
+    ),E'\n   ,') as views,
+  c.relname as viewname
+FROM pg_catalog.pg_attribute a join pg_catalog.pg_class c on a.attrelid = c.oid
+ join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+ join pg_catalog.pg_type t on a.atttypid=t.oid
+ where c.relkind='v' and n.nspname=:'chosen_schema'
+ AND a.attnum > 0 AND NOT a.attisdropped group by c.relname);
+
+select format( E'type Views = \n  ''[%s]\n', string_agg(format('"%s" ::: ''View %sView', viewname, pg_temp.initCaps(viewname)), ',')) as view_name from my_views \gset
+\echo :view_name
+
+select format( E'type %sView = \n  ''[%s]\n', pg_temp.initCaps(viewname),views) as view_tab from my_views \gset
+
+\echo :view_tab

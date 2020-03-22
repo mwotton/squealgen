@@ -32,6 +32,7 @@ LANGUAGE plpgsql;
 \echo {-# LANGUAGE TypeApplications #-}
 \echo {-# LANGUAGE TypeOperators #-}
 \echo {-# LANGUAGE GADTs #-}
+\echo {-# OPTIONS_GHC -fno-warn-unticked-promoted-constructors #-}
 \echo
 \echo module :modulename where
 \echo import Squeal.PostgreSQL
