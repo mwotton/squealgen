@@ -189,10 +189,10 @@ FROM pg_catalog.pg_attribute a join pg_catalog.pg_class c on a.attrelid = c.oid
  where c.relkind='v' and n.nspname=:'chosen_schema'
  AND a.attnum > 0 AND NOT a.attisdropped group by c.relname);
 
-select format( E'type Views = \n  ''[%s]\n', string_agg(format('"%s" ::: ''View %sView', viewname, pg_temp.initCaps(viewname)), ',')) as view_name from my_views \gset
-\echo :view_name
+-- select format( E'type Views = \n  ''[%s]\n', string_agg(format('"%s" ::: ''View %sView', viewname, pg_temp.initCaps(viewname)), ',')) as view_name from my_views \gset
+-- \echo :view_name
 
-select format( E'type %sView = \n  ''[%s]\n', pg_temp.initCaps(viewname),views) as view_tab from my_views \gset
+--select format( E'type %sView = \n  ''[%s]\n', pg_temp.initCaps(viewname),views) as view_tab from my_views \gset
 
-\echo :view_tab
+--\echo :view_tab
 EOF
