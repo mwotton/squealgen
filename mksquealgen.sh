@@ -12,7 +12,8 @@ MODULENAME=$2
 SCHEMA=$3
 EOF
 
-echo 'psql "${DBNAME}" -v chosen_schema="${SCHEMA}" -v modulename="${MODULENAME}" <<"EOF"' >> squealgen
+echo 'PSQLCMD=${PSQLCMD:-psql}' >> squealgen
+echo '$PSQLCMD "${DBNAME}" -v chosen_schema="${SCHEMA}" -v modulename="${MODULENAME}" <<"EOF"' >> squealgen
 cat squealgen.sql >> squealgen
 echo "EOF" >> squealgen
 chmod 755 squealgen
