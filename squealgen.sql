@@ -42,7 +42,8 @@ select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
 \echo
 \echo :db
 \echo
-\echo type Schema = Join (Join Tables Enums) Views
+--\echo type Schema = Join (Join Tables Enums) Views
+\echo type Schema = Join Tables Enums
 
 -- now we emit all the enumerations
 with enumerations as  (select
@@ -60,7 +61,9 @@ from pg_type t
        format(E'type Enums =\n  (''[%s] :: [(Symbol,SchemumType)])',
               coalesce(string_agg(enumerations.decl, E',\n  '), '')) as decl
 from enumerations \gset
+\echo -- enums
 \echo :enums
+\echo -- decls
 \echo :decl
 
 create temporary view columnDefs as (SELECT tables.table_name,
@@ -154,8 +157,10 @@ join (select table_name,
 from constraintDefs  group by table_name) cd on cd.table_name = defs.table_name
 group by cd.table_name) allDefs \gset
 
+\echo -- schema
 \echo :schem
 \echo
+\echo -- defs
 \echo :defs
 
 \echo -- VIEWS
