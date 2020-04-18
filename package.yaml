@@ -25,3 +25,12 @@ library:
   source-dirs: src
   dependencies:
   - squeal-postgresql
+
+tests:
+  tests:
+    main: Spec.hs
+    source-dirs: test
+
+    dependencies:
+    - hspec
+    - squeal-postgresql

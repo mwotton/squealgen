@@ -221,13 +221,6 @@ ALTER TABLE ONLY public.group_member
 
 
 --
--- Name: TABLE agroup; Type: ACL; Schema: public; Owner: mark
---
-
-GRANT ALL ON TABLE public.agroup TO foo;
-
-
---
 -- PostgreSQL database dump complete
 --
 

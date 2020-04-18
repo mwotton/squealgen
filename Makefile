@@ -1,4 +1,4 @@
-testTargets := $(wildcard test/*/Schema.hs)
+testTargets := $(patsubst %.dump.sql,%.hs,$(wildcard test/*/Schema.dump.sql))
 
 hack:
 	while true; do psql ${DBNAME} -v chosen_schema=public -v modulename=Schema < squealgen.sql > src/Schema.hs && echo "start" && tail -30 src/Schema.hs && echo "end" && echo "" | stack repl squealgen:lib 2>&1 | head -20; inotifywait squealgen.sql  -e CLOSE_WRITE; done
@@ -9,10 +9,12 @@ squealgen: squealgen.sql mksquealgen.sh
 install: squealgen
 	install squealgen $(prefix)/bin/squealgen
 
+.PHONY: test
 test: $(testTargets)
 	 stack test
 
-
+clean:
+	rm $(testTargets)
 
 # todo: bomb out if `schema` doesn't exist.
 %.hs: %.dump.sql
@@ -25,6 +27,6 @@ test: $(testTargets)
 #	@echo $<
 
 	psql -d $(db) < $<
-	echo "\d foo" | psql -d $(db)
+#	echo "\d foo" | psql -d $(db)
 #	echo ./squealgen test $(*F) $(schema) > $@
-	./squealgen $(*F) $(schema) -d $(db) > $@
+	./squealgen $(db) "$(patsubst test/%,%,$(*D)).$(*F)" $(schema)  > $@
