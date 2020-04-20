@@ -67,6 +67,8 @@ from enumerations \gset
 \echo :decl
 
 
+
+
 create temporary view columnDefs as (SELECT tables.table_name,
 			 format(E'''[%s]',string_agg(mycolumns.colDef, E'\n  ,' order by mycolumns.ordinal_position)
 			 ) as haskCols
@@ -116,7 +118,7 @@ create temporary view constraintDefs as (
 	 conname,
 	 table_name,
 	 contype,
-	 regexp_split_to_array(pkeytable, ' *, *') as pkeys
+	 (select array_agg(regexp_replace(component.f, '"+', '', 'g')) from regexp_split_to_table(pkeytable, ' *, *') as component(f)) as pkeys
   from
     (select split_part(split_part(condef, 'FOREIGN KEY ', 2), 'REFERENCES', 1) as fk,
             split_part(split_part(condef, 'REFERENCES ', 2), ')', 1) as target,

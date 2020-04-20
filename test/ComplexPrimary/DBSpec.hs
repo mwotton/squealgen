@@ -1,4 +1,8 @@
 -- | This is derived from the demo in the Squeal readme.
+--   we use the column "user" because it tickles a corner case - postgresql double-quotes
+--   it because it's a reserved word postgresql side.
+--  
+--   this also tests complex primary keys
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -18,7 +22,7 @@ import Test.Hspec (it,describe)
 
 import DBHelpers
 
-data User = User { userName :: Text }
+data User = User { userUser :: Text }
   deriving stock (Show, GHC.Generic, Eq)
   deriving anyclass (SOP.Generic, SOP.HasDatatypeInfo)
 
@@ -30,11 +34,11 @@ users =
   ]
 
 insertUser :: Statement DB User ()
-insertUser = manipulation $ insertInto_ #users (Values_ (Default `as` #id :* Set (param @1) `as` #name)) 
+insertUser = manipulation $ insertInto_ #users (Values_ (Default `as` #id :* Set (param @1) `as` #user)) 
 
 getUsers :: Statement DB () User
 getUsers = query $ select_
-  (#u ! #name `as` #userName )
+  (#u ! #user `as` #userUser )
   ( from (table (#users `as` #u)) )
 
 
