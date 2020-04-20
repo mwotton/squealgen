@@ -128,7 +128,7 @@ create temporary view constraintDefs as (
 	 conname,
 	 table_name,
 	 contype,
-	 regexp_split_to_array(pkeytable, ',') as pkeys
+	 regexp_split_to_array(pkeytable, ' *, *') as pkeys
   from
     (select split_part(split_part(condef, 'FOREIGN KEY ', 2), 'REFERENCES', 1) as fk,
             split_part(split_part(condef, 'REFERENCES ', 2), ')', 1) as target,

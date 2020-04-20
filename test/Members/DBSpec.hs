@@ -48,7 +48,6 @@ getUsers = query $ select_
       (#u ! #id .== #e ! #user_id)) )
 
 
-
 spec = describe "Members" $ do
   it "can run a simple query" $ runSession "./test/Members/Schema.dump.sql" $ do
     executePrepared_ insertUser users
