@@ -104,6 +104,7 @@ group by tables.table_catalog,
 	 tables.is_insertable_into,
 	 tables.is_typed,
 	 tables.commit_action
+order by tables.table_name
 	 );
 
 create temporary view constraintDefs as (
