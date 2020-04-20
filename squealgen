@@ -30,6 +30,21 @@ end;
 $$
 LANGUAGE plpgsql;
 
+CREATE or replace FUNCTION pg_temp.stripDoublequotes(arr text[]) RETURNS text[] AS $$
+begin
+   return array_agg(regexp_replace(component.f, '"+', '', 'g')) from unnest(arr) as component(f);
+end;
+$$
+LANGUAGE plpgsql;
+
+
+CREATE or replace FUNCTION pg_temp.stripDoublequotes(arr text[]) RETURNS text[] AS $$
+begin
+   return array_agg(regexp_replace(component.f, '"+', '', 'g')) from unnest(arr) as component(f);
+end;
+$$
+LANGUAGE plpgsql;
+
 -- PRAGMAS of DOOM
 \echo {-# LANGUAGE DataKinds #-}
 \echo {-# LANGUAGE DeriveGeneric #-}
@@ -126,14 +141,14 @@ create temporary view constraintDefs as (
   select regexp_split_to_array(trim(both '()'
                                     from replace(fk, ' ','')),',') as fk,
          split_part(target, '(', 1) as tab,
-         regexp_split_to_array(split_part(target, '(', 2)::text, E', '::text) as reffields,
+	 (select pg_temp.stripDoublequotes(regexp_split_to_array(split_part(target, '(', 2)::text, E', '::text))) as reffields,
 	 conname,
 	 table_name,
 	 contype,
-	 (select array_agg(regexp_replace(component.f, '"+', '', 'g')) from regexp_split_to_table(pkeytable, ' *, *') as component(f)) as pkeys
+	 (select pg_temp.stripDoublequotes(regexp_split_to_array(pkeytable, ' *, *'))) as pkeys
   from
-    (select split_part(split_part(condef, 'FOREIGN KEY ', 2), 'REFERENCES', 1) as fk,
-            split_part(split_part(condef, 'REFERENCES ', 2), ')', 1) as target,
+    (select regexp_replace(split_part(split_part(condef, 'FOREIGN KEY ', 2), 'REFERENCES', 1), '"', '', 'g') as fk,
+            regexp_replace(split_part(split_part(condef, 'REFERENCES ', 2), ')', 1), '"', '', 'g') as target,
 	    split_part(split_part(condef, 'PRIMARY KEY (',2), ')', 1) as pkeytable,
 	    *
      from
