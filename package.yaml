@@ -30,7 +30,19 @@ tests:
   tests:
     main: Spec.hs
     source-dirs: test
+    default-extensions:
+    - DataKinds
+    - DeriveGeneric
+    - OverloadedLabels
+    - FlexibleContexts
+    - TypeApplications
+    - TypeOperators
+    - GADTs
 
     dependencies:
     - hspec
+    - hspec-expectations-lifted
     - squeal-postgresql
+    - unliftio
+    - generics-sop
+    - text

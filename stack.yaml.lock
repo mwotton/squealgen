@@ -5,12 +5,19 @@
 
 packages:
 - completed:
-    hackage: squeal-postgresql-0.5.1.0@sha256:731c2bc1dbf3b02ffc8a3fe2b9215655c2b8e06aa49d18cd6ae66d91de03391f,3449
+    hackage: squeal-postgresql-0.6.0.1@sha256:b6e874d4cf215a5b57b8d070d02ac64bb5e5a4b5ab1e7a1d3c4d3321bf6f82cb,5624
     pantry-tree:
-      size: 2959
-      sha256: bbd3ee0aff2c824b5184ce62ca801d073c2c1ce1ece0af51c994891fe9e40f47
+      size: 5567
+      sha256: 65dda88a47d3d779f909e80c82e79674496a3610a90400bb97a806ae6300d3d9
   original:
-    hackage: squeal-postgresql-0.5.1.0@sha256:731c2bc1dbf3b02ffc8a3fe2b9215655c2b8e06aa49d18cd6ae66d91de03391f,3449
+    hackage: squeal-postgresql-0.6.0.1
+- completed:
+    hackage: free-categories-0.2.0.0@sha256:2d248c669140cf82324569eaf90406c7c9d4a510088aca1979c9bd411bc5980c,855
+    pantry-tree:
+      size: 521
+      sha256: af05c360575925cbb741acfc8daf527ede3b17bf6cc33b25b699821753f545f2
+  original:
+    hackage: free-categories-0.2.0.0@sha256:2d248c669140cf82324569eaf90406c7c9d4a510088aca1979c9bd411bc5980c,855
 snapshots:
 - completed:
     size: 524164

@@ -40,7 +40,8 @@ packages:
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
 extra-deps:
-- squeal-postgresql-0.5.1.0@sha256:731c2bc1dbf3b02ffc8a3fe2b9215655c2b8e06aa49d18cd6ae66d91de03391f,3449
+- squeal-postgresql-0.6.0.1
+- free-categories-0.2.0.0@sha256:2d248c669140cf82324569eaf90406c7c9d4a510088aca1979c9bd411bc5980c,855
 
 
 # Override default flag values for local packages and extra-deps

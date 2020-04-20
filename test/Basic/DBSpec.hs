@@ -1,9 +1,9 @@
-module Basic.Spec where
+module Basic.DBSpec where
 
 import Test.Hspec
-import Schema
+import Basic.Schema
 
 spec = describe "Basic" $ do
   it "compiles" $ do
     -- nothing to do on an empty database
-    pure ()
+    'a' `shouldBe` 'a'

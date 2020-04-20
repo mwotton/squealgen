@@ -10,14 +10,20 @@ install: squealgen
 	install squealgen $(prefix)/bin/squealgen
 
 .PHONY: test
-test: $(testTargets)
+test: squealgen $(testTargets)
 	 stack test
 
 clean:
 	rm $(testTargets)
 
+testwatch:
+	while true; do \
+		inotifywait -r -e modify -e create -e delete -e move $$(find src test -iname '*.hs' | grep -v '#' | grep -v Schema.hs) $$(find . -iname '*\.sql') squealgen.sql mksquealgen.sh Makefile stack.yaml package.yaml ;\
+		make test; \
+	done
+
 # todo: bomb out if `schema` doesn't exist.
-%.hs: %.dump.sql
+%.hs: %.dump.sql squealgen
 
 	$(eval db := $(shell pg_tmp))
 	@echo $(db)

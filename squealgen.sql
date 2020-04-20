@@ -66,13 +66,15 @@ from enumerations \gset
 \echo -- decls
 \echo :decl
 
+
 create temporary view columnDefs as (SELECT tables.table_name,
-			 format(E'''[%s]',string_agg(mycolumns.colDef, E'\n  ,')) as haskCols
+			 format(E'''[%s]',string_agg(mycolumns.colDef, E'\n  ,' order by mycolumns.ordinal_position)
+			 ) as haskCols
 FROM tables
 join (select columns.*,
             format('"%s" ::: %s :=> %s %s',
 	      column_name,
-	      case when column_default is null then '''Def'    else '''NoDef' end,
+	      case when column_default is null then '''NoDef'    else '''Def' end,
 	      (case is_nullable
 	         when 'YES' then '''Null'
 	         when  'NO' then '''NotNull'
