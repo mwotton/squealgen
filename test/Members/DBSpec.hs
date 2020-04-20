@@ -6,13 +6,17 @@
 module Members.DBSpec where
 
 import Members.Schema
+
 import Squeal.PostgreSQL
-import Test.Hspec.Expectations.Lifted
-import Test.Hspec (it,describe)
 import UnliftIO
 import qualified Generics.SOP as SOP
 import qualified GHC.Generics as GHC
-import Data.Text
+import Data.Text(Text)
+
+import Test.Hspec.Expectations.Lifted
+import Test.Hspec (it,describe)
+
+import DBHelpers
 
 data User = User { userName :: Text, userEmail :: Maybe Text }
   deriving stock (Show, GHC.Generic, Eq)
@@ -43,12 +47,10 @@ getUsers = query $ select_
     & innerJoin (table (#emails `as` #e))
       (#u ! #id .== #e ! #user_id)) )
 
-runSession :: MonadUnliftIO m => PQ DB DB m a ->  m a
-runSession = withConnection "host=localhost port=5432 dbname=exampledb"
 
 
 spec = describe "Members" $ do
-  it "can run a simple query" $ runSession @IO $ do
+  it "can run a simple query" $ runSession "./test/Members/Schema.dump.sql" $ do
     executePrepared_ insertUser users
     fetchedUsers <- getRows =<< execute getUsers
     fetchedUsers `shouldBe` users

@@ -40,9 +40,11 @@ tests:
     - GADTs
 
     dependencies:
+    - bytestring
     - hspec
     - hspec-expectations-lifted
     - squeal-postgresql
     - unliftio
     - generics-sop
     - text
+    - tmp-postgres

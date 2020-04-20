@@ -18,8 +18,8 @@ clean:
 
 testwatch:
 	while true; do \
-		inotifywait -r -e modify -e create -e delete -e move $$(find src test -iname '*.hs' | grep -v '#' | grep -v Schema.hs) $$(find . -iname '*\.sql') squealgen.sql mksquealgen.sh Makefile stack.yaml package.yaml ;\
 		make test; \
+		inotifywait -r -e modify -e create -e delete -e move $$(find src test -iname '*.hs' | grep -v '#' | grep -v Schema.hs) $$(find . -iname '*\.sql') squealgen.sql mksquealgen.sh Makefile stack.yaml package.yaml ;\
 	done
 
 # todo: bomb out if `schema` doesn't exist.
@@ -27,12 +27,7 @@ testwatch:
 
 	$(eval db := $(shell pg_tmp))
 	@echo $(db)
-
 	$(eval schema := $(shell cat $(@D)/schema))
-	@echo $(schema)
-#	@echo $<
-
 	psql -d $(db) < $<
-#	echo "\d foo" | psql -d $(db)
-#	echo ./squealgen test $(*F) $(schema) > $@
 	./squealgen $(db) "$(patsubst test/%,%,$(*D)).$(*F)" $(schema)  > $@
+        # an unprincipled hack: we tag the db connstr in the directory
