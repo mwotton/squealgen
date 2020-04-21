@@ -25,6 +25,8 @@ library:
   source-dirs: src
   dependencies:
   - squeal-postgresql
+data-files:
+- squealgen.sql
 
 tests:
   tests:
