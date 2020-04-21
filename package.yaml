@@ -10,7 +10,7 @@ extra-source-files:
 - README.md
 - ChangeLog.md
 - squealgen
-- squealgen.sql
+# - squealgen.sql
 
 # Metadata used when publishing your package
 synopsis:            generate squeal types from an existing database
@@ -20,11 +20,11 @@ description:         Please see the README on GitHub at <https://github.com/mwot
 dependencies:
 - base >= 4.7 && < 5
 
-# this is more or less a stub for testing purposes.
+# just a stub
 library:
-  source-dirs: src
-  dependencies:
-  - squeal-postgresql
+  exposed-modules:
+  - Paths_squealgen
+
 data-files:
 - squealgen.sql
 

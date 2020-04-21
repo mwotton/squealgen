@@ -30,13 +30,12 @@ recommend it if you're running migrations through Haskell.
 
 My workflow looks like this:
 
-```DBNAME=somedb make hack```
+```make testwatch```
 
-This creates a file `src/Schema.hs` and then tries to load it. It relies on `inotifywait` to watch the
-psql driver (`squealgen.sql`)
 
 ## what next?
 
 - Remove string-hacking, generate in a more principled way.
-- Create a test suite that doesn't rely on a local database, test somewhere else.
 - Extract check constraints (maybe). This is much harder than the rest of it.
+- Views
+- Triggers
