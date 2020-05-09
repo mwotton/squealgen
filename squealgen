@@ -9,7 +9,7 @@ DBNAME=$1
 MODULENAME=$2
 SCHEMA=$3
 PSQLCMD=${PSQLCMD:-psql}
-$PSQLCMD "${DBNAME}" -v chosen_schema="${SCHEMA}" -v modulename="${MODULENAME}" <<"EOF"
+$PSQLCMD -d "${DBNAME}" -v chosen_schema="${SCHEMA}" -v modulename="${MODULENAME}" <<"EOF"
 \set QUIET
 \set ON_ERROR_STOP true
 
