@@ -1,1 +1,1 @@
-create table foo (name text);
+create table foos (name text not null);
