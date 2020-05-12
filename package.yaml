@@ -50,3 +50,5 @@ tests:
     - generics-sop
     - text
     - tmp-postgres
+    - containers
+    - network-ip

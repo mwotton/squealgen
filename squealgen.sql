@@ -101,10 +101,19 @@ join (select columns.*,
                  -- mildly tricky: standard postgresql datatypes need a tick, usergen types don't. HOWEVER! if we leave them off, we just
 		 -- get warnings, so this might be something to fix later.
 		 (case
-		 	      -- this won't work for everything - should check if it's got a max length.
-                    when udt_name = 'varchar' then 'PGtext'
-                    else ('PG' || (udt_name :: text))
-	  	    end)) as colDef
+		   when data_type = 'ARRAY' then
+   		   -- possibly we shouldn't be assuming the elements of the array are non-null?
+		     (case when udt_name = '_varchar' then '(PGvararray (NotNull PGtext))'
+                           else ('(PGvararray (NotNull PG' || (trim(leading '_' from udt_name::text)) || '))')
+                           end)
+                   else
+		     (case
+			-- this won't work for everything - should check if it's got a max length.
+			--                    when udt_name = 'varchar' then 'PGtext'
+			when udt_name = 'varchar' then 'PGtext'
+			else ('PG' || (udt_name :: text))
+			end)
+		   end)) as colDef
   from columns) mycolumns on mycolumns.table_name = tables.table_name
 
 WHERE table_type = 'BASE TABLE'
