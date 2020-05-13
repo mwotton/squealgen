@@ -70,7 +70,7 @@ select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
 \echo :db
 \echo
 --\echo type Schema = Join (Join Tables Enums) Views
-\echo type Schema = Join Tables Enums
+\echo type Schema = Join Tables (Join Views Enums)
 
 -- now we emit all the enumerations
 with enumerations as  (select
@@ -224,10 +224,10 @@ FROM pg_catalog.pg_attribute a join pg_catalog.pg_class c on a.attrelid = c.oid
  where c.relkind='v' and n.nspname=:'chosen_schema'
  AND a.attnum > 0 AND NOT a.attisdropped group by c.relname);
 
--- select format( E'type Views = \n  ''[%s]\n', string_agg(format('"%s" ::: ''View %sView', viewname, pg_temp.initCaps(viewname)), ',')) as view_name from my_views \gset
--- \echo :view_name
-
---select format( E'type %sView = \n  ''[%s]\n', pg_temp.initCaps(viewname),views) as view_tab from my_views \gset
-
---\echo :view_tab
+-- select coalesce(string_agg(allDefs.tabData, E'\n'),'') as defs,
+select format( E'type Views = \n  ''[%s]\n', coalesce(string_agg(format('"%s" ::: ''View %sView', viewname, pg_temp.initCaps(viewname)), ',')), '') as viewtype,
+       coalesce (string_agg( format( E'type %sView = \n  ''[%s]\n', pg_temp.initCaps(viewname),views), E'\n'), '') as views
+       from my_views \gset
+\echo :viewtype
+\echo :views
 EOF

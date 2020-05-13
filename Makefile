@@ -8,15 +8,18 @@ install: squealgen
 
 .PHONY: test
 test: squealgen $(testTargets)
-	 stack test
+	 stack test --ghc-options="-fprint-potential-instances"
 
 clean:
 	rm $(testTargets)
+.PHONY: initdb_exists
+initdb_exists:
+	which initdb
 
-testwatch:
+testwatch: initdb_exists
 	while true; do \
 		make test; \
-		inotifywait -r -e modify -e create -e delete -e move $$(find src test -iname '*.hs' | grep -v '#' | grep -v Schema.hs) $$(find . -iname '*\.sql') squealgen.sql mksquealgen.sh Makefile stack.yaml package.yaml ;\
+		inotifywait -r -e modify -e create -e delete -e move $$(find test -iname '*.hs' | grep -v '#' | grep -v Schema.hs) $$(find . -iname '*\.sql' | grep -v '#' ) squealgen.sql mksquealgen.sh Makefile stack.yaml package.yaml ;\
 	done
 
 # todo: bomb out if `schema` doesn't exist.
@@ -25,6 +28,5 @@ testwatch:
 	$(eval db := $(shell pg_tmp))
 	@echo $(db)
 	$(eval schema := $(shell cat $(@D)/schema))
-	psql -d $(db) < $<
-	./squealgen $(db) "$(patsubst test/%,%,$(*D)).$(*F)" $(schema)  > $@
+	psql -d $(db) < $< && ./squealgen $(db) "$(patsubst test/%,%,$(*D)).$(*F)" $(schema)  > $@
         # an unprincipled hack: we tag the db connstr in the directory

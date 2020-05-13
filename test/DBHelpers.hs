@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 module DBHelpers where
 
 import qualified Data.ByteString.Char8  as BS8
+import           Data.Int
 import           Database.Postgres.Temp (toConnectionString, with)
 import           Squeal.PostgreSQL      hiding (with)
 import           System.IO
