@@ -58,7 +58,7 @@ select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
 \echo :db
 \echo
 --\echo type Schema = Join (Join Tables Enums) Views
-\echo type Schema = Join Tables (Join Views (Join Enums Functions))
+\echo type Schema = Join Tables (Join Views (Join Enums (Join Functions Domains)))
 
 -- now we emit all the enumerations
 with enumerations as  (select
@@ -241,3 +241,14 @@ from
 	    ret_type) funcdefs \gset
 
 \echo :functions
+
+SELECT format('type Domains = ''[%s]',
+         coalesce(string_agg(format(E'"%s" ::: ''Typedef ''PG%s',
+	 				   pg_type.typname, p2.typname  ),
+			E'\n   ,' ), '')) as domains
+FROM pg_catalog.pg_type
+JOIN pg_catalog.pg_namespace ON pg_namespace.oid = pg_type.typnamespace
+join pg_catalog.pg_type p2 on pg_type.typbasetype = p2.oid
+WHERE pg_type.typtype = 'd' AND nspname = :'chosen_schema' \gset
+
+\echo :domains
