@@ -224,7 +224,7 @@ select format( E'type Views = \n  ''[%s]\n', coalesce(string_agg(format('"%s" ::
 select format(E'type Functions = \n  ''[ %s ]',
 	       coalesce(string_agg(funcdefs.stringform, E'\n   , '), '')) as functions
 from
-  (select format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null ''PG%s) )',
+  (select format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null PG%s) )',
     funcs.proname,
     string_agg(format(E'''Null PG%s', pg_type.typname), ', '),
     ret_type) as stringform
