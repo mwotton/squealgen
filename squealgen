@@ -70,7 +70,7 @@ select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
 \echo :db
 \echo
 --\echo type Schema = Join (Join Tables Enums) Views
-\echo type Schema = Join Tables (Join Views Enums)
+\echo type Schema = Join Tables (Join Views (Join Enums Functions))
 
 -- now we emit all the enumerations
 with enumerations as  (select
@@ -230,4 +230,27 @@ select format( E'type Views = \n  ''[%s]\n', coalesce(string_agg(format('"%s" ::
        from my_views \gset
 \echo :viewtype
 \echo :views
+
+\echo -- functions
+
+select format(E'type Functions = ''[ %s ]',
+	       coalesce(string_agg(funcdefs.stringform, E'  ,\n'), '')) as functions
+from
+  (select format(E'"%s" ::: Function ([ %s ] :=> ''Returns ( ''Null ''PG%s) )',
+    funcs.proname,
+    string_agg(format(E'''Null PG%s', pg_type.typname), ', '),
+    ret_type) as stringform
+   from
+     (SELECT p.proname,
+	     unnest(p.proargtypes) as arg,
+	     pg_type.typname as ret_type
+      FROM pg_proc p
+      INNER JOIN pg_namespace ns ON (p.pronamespace = ns.oid)
+      inner join pg_type on p.prorettype=pg_type.oid
+      WHERE ns.nspname = :'chosen_schema') as funcs
+   join pg_type on funcs.arg=pg_type.oid
+   group by proname,
+	    ret_type) funcdefs \gset
+
+\echo :functions
 EOF

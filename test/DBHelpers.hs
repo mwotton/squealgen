@@ -14,11 +14,9 @@ runSession :: FilePath
            -> PQ schema schema IO a
            -> IO a
 runSession sqlfile f = either (error . show)  pure =<< do
-
   sql <- BS8.readFile sqlfile
   withDbCache $ \cache -> do
     withConfig (cacheConfig cache) $ \db -> do
-      print (toConnectionString db)
       withConnection (toConnectionString db) $ do
         define (UnsafeDefinition sql)
         f
