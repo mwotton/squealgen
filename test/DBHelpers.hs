@@ -5,7 +5,7 @@ module DBHelpers where
 
 import qualified Data.ByteString.Char8  as BS8
 import           Data.Int
-import           Database.Postgres.Temp (toConnectionString, with)
+import           Database.Postgres.Temp
 import           Squeal.PostgreSQL      hiding (with)
 import           System.IO
 import           UnliftIO
@@ -16,7 +16,9 @@ runSession :: FilePath
 runSession sqlfile f = either (error . show)  pure =<< do
 
   sql <- BS8.readFile sqlfile
-  with $ \db -> do
-    withConnection (toConnectionString db) $ do
-      define (UnsafeDefinition sql)
-      f
+  withDbCache $ \cache -> do
+    withConfig (cacheConfig cache) $ \db -> do
+      print (toConnectionString db)
+      withConnection (toConnectionString db) $ do
+        define (UnsafeDefinition sql)
+        f
