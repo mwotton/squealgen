@@ -13,22 +13,27 @@ import           Squeal.PostgreSQL
 import           Test.Hspec
 
 -- interesting to note that we are collecting the raw int names, like int4 and int8.
--- this shouldn't make a difference, really, but functions like pg_get_function_result
--- get the "sugared" names. not entirely clear how they get it.
 --
 -- not currently generating set-returning functions, fixme.
+--
+-- nb: multi-argument functions need to be called with functionN
 
-doublerQuery :: Statement DB () (Only (Maybe Int64))
-doublerQuery = query $
-  select_ ((functionN #doubler) ((12 & notNull)
+multiArgQuery :: Statement DB () (Only (Maybe Int64))
+multiArgQuery = query $
+  select_ ((functionN #somefunc) ((12 & notNull)
                                  *: notNull (#integers ! #num)) `as` #fromOnly)
   (from (table #integers))
 
-
+doublerQuery :: Statement DB () (Only (Maybe Int64))
+doublerQuery = query $
+  select_ ((function #doubler) (notNull $ #integers ! #num) `as` #fromOnly)
+  (from (table #integers))
 
 spec = describe "Functions" $ do
   it "doubles things" $ do
     printSQL doublerQuery
     runSession "./test/Functions/Schema.dump.sql"
-      (getRows =<< execute doublerQuery)
-        `shouldReturn` [Only (Just 25)]
+      ((,) <$> (getRows =<< execute multiArgQuery)
+           <*> (getRows =<< execute doublerQuery))
+      `shouldReturn` ([Only (Just 25)]
+                     ,[Only (Just 2)])
