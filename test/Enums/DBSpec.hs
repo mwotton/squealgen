@@ -21,13 +21,16 @@ data TrafficLight = Red | Yellow | Green
   deriving anyclass (SOP.Generic, SOP.HasDatatypeInfo)
   deriving (IsPG, ToPG db, FromPG, Inline) via (Enumerated TrafficLight)
 
-
+getLightsFromView :: Statement DB () (Only (Maybe TrafficLight))
+getLightsFromView = query $ select_ (#lights_v ! #light `as` #fromOnly) (from (view #lights_v))
 
 getLights :: Statement DB () (Only TrafficLight)
 getLights = query $ select_ (#lights ! #light `as` #fromOnly) (from (table #lights))
 
 spec = describe "Enums" $ do
-  it "can fetch enums" $ do
+  it "can fetch enums, and enums from a view" $ do
     runSession "./test/Enums/Schema.dump.sql"
-      (getRows =<< execute getLights)
-      `shouldReturn` ([Only Red,Only Yellow])
+      ((,) <$> (getRows =<< execute getLights)
+           <*> (getRows =<< execute getLightsFromView))
+      `shouldReturn` ([Only Red,Only Yellow]
+                     ,[Only (Just Yellow),Only (Just Green)])

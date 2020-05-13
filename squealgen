@@ -209,7 +209,7 @@ group by defs.table_name) allDefs \gset
 
 create temporary view my_views as (
 SELECT
-  string_agg(format(E'"%s" ::: ''%s ''PG%s',
+  string_agg(format(E'"%s" ::: ''%s PG%s',
     a.attname,
     case when a.attnotnull
       then 'NotNull'
