@@ -252,10 +252,10 @@ from
 \echo :functions
 
 SELECT format('type Domains = ''[%s]',
-         coalesce(string_agg(format(E'"%s" ::: ''Typedef ''PG%s',
+         coalesce(string_agg(format(E'"%s" ::: ''Typedef PG%s',
 	 				   pg_type.typname, p2.typname  ),
 			E'\n   ,' ), '')) as domains,
-       coalesce(string_agg(format ('type PG%s = ''PG%s', pg_type.typname, p2.typname ) , E'\n'), '') as decls
+       coalesce(string_agg(format ('type PG%s = PG%s', pg_type.typname, p2.typname ) , E'\n'), '') as decls
 FROM pg_catalog.pg_type
 JOIN pg_catalog.pg_namespace ON pg_namespace.oid = pg_type.typnamespace
 join pg_catalog.pg_type p2 on pg_type.typbasetype = p2.oid
