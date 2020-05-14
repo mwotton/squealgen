@@ -12,3 +12,7 @@ $$ language sql;
 create function strict_doubler(int8) returns int8 as $$
   select (2*$1);
 $$ language sql strict;
+
+create function inout_params(IN var int8, OUT plus1 int8, OUT plus2 int8) as $$
+  select var+1 as plus1, var+2 as plus2;
+$$ language sql strict;

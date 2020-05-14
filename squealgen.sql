@@ -241,7 +241,10 @@ from
       FROM pg_proc p
       INNER JOIN pg_namespace ns ON (p.pronamespace = ns.oid)
       inner join pg_type on p.prorettype=pg_type.oid
-      WHERE ns.nspname = :'chosen_schema') as funcs
+      WHERE ns.nspname = :'chosen_schema'
+      -- TODO we can't currently model functions with in and out parameters,
+      -- so we'll just avoid generating anything for them.
+      AND pg_type.typname <> 'record') as funcs
    join pg_type on funcs.arg=pg_type.oid
    group by proname,
 	    ret_type) funcdefs \gset
