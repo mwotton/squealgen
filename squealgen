@@ -238,10 +238,16 @@ select format(E'type Functions = \n  ''[ %s ]',
 from
   (select format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null PG%s) )',
     funcs.proname,
-    string_agg(format(E'''Null PG%s', pg_type.typname), ', '),
+    string_agg(format(E'''%s PG%s',
+    			     (case when proisstrict
+			          then 'NotNull'
+				  else 'Null'
+			      end)
+    			     , pg_type.typname), ', '),
     ret_type) as stringform
    from
      (SELECT p.proname,
+             p.proisstrict,
 	     unnest(p.proargtypes) as arg,
 	     pg_type.typname as ret_type
       FROM pg_proc p
@@ -257,11 +263,13 @@ from
 SELECT format('type Domains = ''[%s]',
          coalesce(string_agg(format(E'"%s" ::: ''Typedef ''PG%s',
 	 				   pg_type.typname, p2.typname  ),
-			E'\n   ,' ), '')) as domains
+			E'\n   ,' ), '')) as domains,
+       coalesce(string_agg(format ('type PG%s = ''PG%s', pg_type.typname, p2.typname ) , E'\n'), '') as decls
 FROM pg_catalog.pg_type
 JOIN pg_catalog.pg_namespace ON pg_namespace.oid = pg_type.typnamespace
 join pg_catalog.pg_type p2 on pg_type.typbasetype = p2.oid
 WHERE pg_type.typtype = 'd' AND nspname = :'chosen_schema' \gset
 
 \echo :domains
+\echo :decls
 EOF
