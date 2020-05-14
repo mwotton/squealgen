@@ -246,6 +246,9 @@ from
       -- so we'll just avoid generating anything for them.
       AND pg_type.typname <> 'record') as funcs
    join pg_type on funcs.arg=pg_type.oid
+   -- internal args are never usable from sql.
+   where pg_type.typname <> 'internal'
+   and ret_type <> 'internal'
    group by proname,
 	    ret_type) funcdefs \gset
 
