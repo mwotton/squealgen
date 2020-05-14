@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Domains.DBSpec where
 
 import           Data.Int
@@ -18,15 +19,14 @@ import           Test.Hspec
 newtype PositiveInt = PositiveInt { unPositive :: Int64 }
   deriving stock (Eq,Show,GHC.Generic)
   deriving anyclass (SOP.Generic, SOP.HasDatatypeInfo)
-
+  deriving newtype (IsPG,FromPG)
 
 validInsert :: Statement DB PositiveInt ()
 validInsert = manipulation $
   insertInto_ #pluslove
     (Values_ (Set (param @1) `as` #num))
 
--- FIXME this should return (Only (Maybe PositiveInt)), waiting for help from eitan
-increment :: Statement DB PositiveInt (Only (Maybe Int64))
+increment :: Statement DB PositiveInt (Only (Maybe PositiveInt))
 increment = query $ values ((function #increment_positive) (param @1) `as` #fromOnly) []
 
 spec = describe "Domains" $ do
@@ -41,4 +41,4 @@ spec = describe "Domains" $ do
   it "can run a function that takes and returns a domain" $ do
     runSession "./test/Domains/Schema.dump.sql"
       (getRows =<< executeParams increment (PositiveInt 1))
-      `shouldReturn` [Only (Just 2)]
+      `shouldReturn` [Only (Just $ PositiveInt 2)]
