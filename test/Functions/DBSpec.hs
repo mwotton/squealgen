@@ -29,9 +29,15 @@ doublerQuery = query $
   select_ ((function #doubler) (notNull $ #integers ! #num) `as` #fromOnly)
   (from (table #integers))
 
+-- | in this test, the inputs are defined to be not-null, because strict_doubler is annotated as strict.
+strictDoublerQuery :: Statement DB () (Only (Maybe Int64))
+strictDoublerQuery = query $
+  select_ ((function #strict_doubler) (#integers ! #num) `as` #fromOnly)
+  (from (table #integers))
+
+
 spec = describe "Functions" $ do
   it "doubles things" $ do
-    printSQL doublerQuery
     runSession "./test/Functions/Schema.dump.sql"
       ((,) <$> (getRows =<< execute multiArgQuery)
            <*> (getRows =<< execute doublerQuery))
