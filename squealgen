@@ -37,6 +37,28 @@ end;
 $$
 LANGUAGE plpgsql;
 
+create or replace function pg_temp.type_decl_from(data_type text, udt_name text, nullable bool) RETURNS text as $$
+  select
+  (case
+	-- this is pretty bad - we source the datatypes from the information_schema and also the basic tables (pg_type).
+	-- probably better to move it to just the basic tables.
+    when (data_type = 'ARRAY' or data_type = 'A') then
+      format('(PGvararray (%s %s))'
+            , case when nullable then 'Null' else 'NotNull' end
+            , case when udt_name = '_varchar' then 'PGtext'
+	           else 'PG' || (trim(leading '_' from udt_name::text))
+              end)
+    else
+      (case
+	 -- this won't work for everything - should check if it's got a max length.
+	 --                    when udt_name = 'varchar' then 'PGtext'
+	 when udt_name = 'varchar' then 'PGtext'
+	 else ('PG' || (udt_name :: text))
+	 end)
+    end);
+$$
+LANGUAGE sql;
+
 
 CREATE or replace FUNCTION pg_temp.stripDoublequotes(arr text[]) RETURNS text[] AS $$
 begin
@@ -44,6 +66,15 @@ begin
 end;
 $$
 LANGUAGE plpgsql;
+-- CREATE or replace FUNCTION pg_temp.is_pseudotype(field text) RETURNS bool] AS $$
+-- begin
+
+--    return array_agg(regexp_replace(component.f, '"+', '', 'g')) from unnest(arr) as component(f);
+-- end;
+
+
+
+
 
 -- PRAGMAS of DOOM
 \echo {-# LANGUAGE DataKinds #-}
@@ -63,7 +94,11 @@ LANGUAGE plpgsql;
 \echo
 \echo '-- squeal doesn''t yet support cidr or ltree, so for the moment we emit them explicitly'
 \echo type PGcidr = UnsafePGType "cidr"
+
+-- should really move these out somehow
 \echo type PGltree = UnsafePGType "ltree"
+\echo type PGltxtquery = UnsafePGType "ltxtquery"
+\echo type PGlquery = UnsafePGType "lquery"
 
 select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
 \echo
@@ -109,23 +144,9 @@ join (select columns.*,
 	         when  'NO' then '''NotNull'
 	         else pg_temp.croak ('is_nullable broken somehow: ' || is_nullable)
 		 end ),
-
-                 -- mildly tricky: standard postgresql datatypes need a tick, usergen types don't. HOWEVER! if we leave them off, we just
-		 -- get warnings, so this might be something to fix later.
-		 (case
-		   when data_type = 'ARRAY' then
-   		   -- possibly we shouldn't be assuming the elements of the array are non-null?
-		     (case when udt_name = '_varchar' then '(PGvararray (NotNull PGtext))'
-                           else ('(PGvararray (NotNull PG' || (trim(leading '_' from udt_name::text)) || '))')
-                           end)
-                   else
-		     (case
-			-- this won't work for everything - should check if it's got a max length.
-			--                    when udt_name = 'varchar' then 'PGtext'
-			when udt_name = 'varchar' then 'PGtext'
-			else ('PG' || (udt_name :: text))
-			end)
-		   end)) as colDef
+		 -- nb: we are assuming the inner array may be nullable. this may not be true, TODO
+		 pg_temp.type_decl_from(data_type, udt_name, false)
+		 ) as colDef
   from columns) mycolumns on mycolumns.table_name = tables.table_name
 
 WHERE table_type = 'BASE TABLE'
@@ -238,12 +259,21 @@ select format(E'type Functions = \n  ''[ %s ]',
 from
   (select format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null PG%s) )',
     funcs.proname,
-    string_agg(format(E'''%s PG%s',
-    			     (case when proisstrict
+--    		 pg_temp.type_decl_from(data_type, udt_name, false)
+    string_agg(format('%s %s',
+        			     (case when proisstrict
 			          then 'NotNull'
 				  else 'Null'
-			      end)
-    			     , pg_type.typname), ', '),
+			      end),
+
+      pg_temp.type_decl_from(pg_type.typcategory ,pg_type.typname,false),', '), ',  '),
+    -- format(E'''%s PG%s',
+    -- 			     (case when proisstrict
+    -- 			          then 'NotNull'
+    -- 				  else 'Null'
+    -- 			      end)
+    --    			     , pg_type.typname)
+    --			     , ', '),
     ret_type) as stringform
    from
      (SELECT p.proname,
@@ -256,11 +286,12 @@ from
       WHERE ns.nspname = :'chosen_schema'
       -- TODO we can't currently model functions with in and out parameters,
       -- so we'll just avoid generating anything for them.
-      AND pg_type.typname <> 'record') as funcs
+      -- we will still want to ignore all other pseudotypes
+      -- but records will be ok eventually.
+      AND pg_type.typtype <> 'p') as funcs
    join pg_type on funcs.arg=pg_type.oid
    -- internal args are never usable from sql.
-   where pg_type.typname <> 'internal'
-   and ret_type <> 'internal'
+   where pg_type.typtype <> 'p'
    group by proname,
 	    ret_type) funcdefs \gset
 
