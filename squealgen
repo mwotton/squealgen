@@ -230,13 +230,13 @@ group by defs.table_name) allDefs \gset
 
 create temporary view my_views as (
 SELECT
-  string_agg(format(E'"%s" ::: ''%s PG%s',
+  string_agg(format(E'"%s" ::: ''%s %s',
     a.attname,
     case when a.attnotnull
       then 'NotNull'
       else 'Null'
     end,
-    t.typname
+    pg_temp.type_decl_from(t.typcategory,t.typname,false)
     ),E'\n   ,') as views,
   c.relname as viewname
 FROM pg_catalog.pg_attribute a join pg_catalog.pg_class c on a.attrelid = c.oid
