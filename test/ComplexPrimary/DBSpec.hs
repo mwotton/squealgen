@@ -1,7 +1,7 @@
 -- | This is derived from the demo in the Squeal readme.
 --   we use the column "user" because it tickles a corner case - postgresql double-quotes
 --   it because it's a reserved word postgresql side.
---  
+--
 --   this also tests complex primary keys
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -28,13 +28,13 @@ data User = User { userUser :: Text }
 
 users :: [User]
 users =
-  [ User "Alice" 
-  , User "Bob" 
+  [ User "Alice"
+  , User "Bob"
   , User "Carole"
   ]
 
 insertUser :: Statement DB User ()
-insertUser = manipulation $ insertInto_ #users (Values_ (Default `as` #id :* Set (param @1) `as` #user)) 
+insertUser = manipulation $ insertInto_ #users (Values_ (Default `as` #id :* Set (param @1) `as` #user))
 
 getUsers :: Statement DB () User
 getUsers = query $ select_

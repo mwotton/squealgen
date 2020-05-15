@@ -25,7 +25,7 @@ end;
 $$
 LANGUAGE plpgsql;
 
-create or replace function pg_temp.type_decl_from(data_type text, udt_name text, nullable bool) RETURNS text as $$
+create or replace function pg_temp.type_decl_from(data_type text, udt_name text, nullable bool, fieldlen cardinal_number) RETURNS text as $$
   select
   (case
 	-- this is pretty bad - we source the datatypes from the information_schema and also the basic tables (pg_type).
@@ -33,14 +33,16 @@ create or replace function pg_temp.type_decl_from(data_type text, udt_name text,
     when (data_type = 'ARRAY' or data_type = 'A') then
       format('(PGvararray (%s %s))'
             , case when nullable then 'Null' else 'NotNull' end
-            , case when udt_name = '_varchar' then 'PGtext'
+            , case when udt_name = '_varchar' and fieldlen is null then 'PGtext'
+	           when udt_name = '_varchar' then format('(PGvarchar %s)', fieldlen)
 	           else 'PG' || (trim(leading '_' from udt_name::text))
               end)
     else
       (case
 	 -- this won't work for everything - should check if it's got a max length.
 	 --                    when udt_name = 'varchar' then 'PGtext'
-	 when udt_name = 'varchar' then 'PGtext'
+	 when udt_name = 'varchar' and fieldlen is null then 'PGtext'
+         when udt_name = 'varchar' then format('(PGvarchar %s)', fieldlen)
 	 else ('PG' || (udt_name :: text))
 	 end)
     end);
@@ -133,7 +135,7 @@ join (select columns.*,
 	         else pg_temp.croak ('is_nullable broken somehow: ' || is_nullable)
 		 end ),
 		 -- nb: we are assuming the inner array may be nullable. this may not be true, TODO
-		 pg_temp.type_decl_from(data_type, udt_name, false)
+		 pg_temp.type_decl_from(data_type, udt_name, false, character_maximum_length)
 		 ) as colDef
   from columns) mycolumns on mycolumns.table_name = tables.table_name
 
@@ -224,7 +226,7 @@ SELECT
       then 'NotNull'
       else 'Null'
     end,
-    pg_temp.type_decl_from(t.typcategory,t.typname,false)
+    pg_temp.type_decl_from(t.typcategory,t.typname,false,null) -- this may be dodgy? need a view that has a varchar(n)
     ),E'\n   ,') as views,
   c.relname as viewname
 FROM pg_catalog.pg_attribute a join pg_catalog.pg_class c on a.attrelid = c.oid
@@ -250,7 +252,7 @@ from
 	  , string_agg(format('%s %s', (case
 				 when proisstrict then 'NotNull'
 				 else 'Null'
-			     end), pg_temp.type_decl_from(type_arg.typcategory,type_arg.typname,false))
+			     end), pg_temp.type_decl_from(type_arg.typcategory,type_arg.typname,false,null)) -- fixme
 			     , ',  ' order by arg_index)
           , ret_type) as stringform
 	  , funcs.proname

@@ -52,3 +52,7 @@ tests:
     - tmp-postgres
     - containers
     - network-ip
+
+    # temp until merge
+    - postgresql-binary
+    - mtl
