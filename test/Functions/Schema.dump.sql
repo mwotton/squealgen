@@ -16,3 +16,8 @@ $$ language sql strict;
 create function inout_params(IN var int8, OUT plus1 int8, OUT plus2 int8) as $$
   select var+1 as plus1, var+2 as plus2;
 $$ language sql strict;
+
+
+create function many_params(one int8,two real,three text) returns text as $$
+  select three;
+$$ language sql strict;

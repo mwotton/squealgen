@@ -242,47 +242,43 @@ select format( E'type Views = \n  ''[%s]\n', coalesce(string_agg(format('"%s" ::
 
 \echo -- functions
 
-select format(E'type Functions = \n  ''[ %s ]',
-	       coalesce(string_agg(funcdefs.stringform, E'\n   , '), '')) as functions
+select format(E'type Functions = \n  ''[ %s ]'
+     , coalesce(string_agg(funcdefs.stringform, E'\n   , ' order by funcdefs.proname), '')) as functions
 from
-  (select format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null PG%s) )',
-    funcs.proname,
---    		 pg_temp.type_decl_from(data_type, udt_name, false)
-    string_agg(format('%s %s',
-        			     (case when proisstrict
-			          then 'NotNull'
-				  else 'Null'
-			      end),
-
-      pg_temp.type_decl_from(pg_type.typcategory ,pg_type.typname,false),', '), ',  '),
-    -- format(E'''%s PG%s',
-    -- 			     (case when proisstrict
-    -- 			          then 'NotNull'
-    -- 				  else 'Null'
-    -- 			      end)
-    --    			     , pg_type.typname)
-    --			     , ', '),
-    ret_type) as stringform
+  (select format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null PG%s) )'
+          , funcs.proname
+	  , string_agg(format('%s %s', (case
+				 when proisstrict then 'NotNull'
+				 else 'Null'
+			     end), pg_temp.type_decl_from(type_arg.typcategory,type_arg.typname,false))
+			     , ',  ' order by arg_index)
+          , ret_type) as stringform
+	  , funcs.proname
    from
-     (SELECT p.proname,
-             p.proisstrict,
-	     unnest(p.proargtypes) as arg,
-	     pg_type.typname as ret_type
-      FROM pg_proc p
-      INNER JOIN pg_namespace ns ON (p.pronamespace = ns.oid)
-      inner join pg_type on p.prorettype=pg_type.oid
-      WHERE ns.nspname = :'chosen_schema'
-      -- TODO we can't currently model functions with in and out parameters,
-      -- so we'll just avoid generating anything for them.
-      -- we will still want to ignore all other pseudotypes
-      -- but records will be ok eventually.
-      AND pg_type.typtype <> 'p') as funcs
-   join pg_type on funcs.arg=pg_type.oid
-   -- internal args are never usable from sql.
-   where pg_type.typtype <> 'p'
-   group by proname,
-	    ret_type) funcdefs \gset
-
+     (select proname,
+     	     pronamespace,
+	     proisstrict,
+	     typname,
+	     args.arg,
+	     args.arg_index,
+	     type_ret.typname as ret_type
+      from pg_proc p
+      	   -- need ordinality to keep function argument ordering correct
+          ,unnest(p.proargtypes) with  ordinality as args(arg,arg_index)
+	  ,pg_namespace ns
+	  ,pg_type type_ret
+	  WHERE p.pronamespace = ns.oid
+	  AND p.prorettype=type_ret.oid
+	  AND ns.nspname = :'chosen_schema'
+	  -- TODO we can't currently model functions with in and out parameters,
+	  -- so we'll just avoid generating anything for them.
+	  -- we will still want to ignore all other pseudotypes
+	  -- but records will be ok eventually.
+	  AND type_ret.typtype <> 'p') as funcs
+join pg_type type_arg on funcs.arg=type_arg.oid -- internal args are never usable from sql.
+where type_arg.typtype <> 'p'
+group by proname,
+	 ret_type ) funcdefs \gset
 \echo :functions
 
 SELECT format('type Domains = ''[%s]',

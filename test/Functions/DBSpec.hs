@@ -35,11 +35,18 @@ strictDoublerQuery = query $
   select_ ((function #strict_doubler) (#integers ! #num) `as` #fromOnly)
   (from (table #integers))
 
+manyParamsQuery :: Statement DB (Int64, Float, String) (Only (Maybe String))
+manyParamsQuery = query $
+  values_ ((functionN #many_params) (param @1 :* param @2 *: param @3) `as` #fromOnly)
 
 spec = describe "Functions" $ do
   it "doubles things" $ do
     runSession "./test/Functions/Schema.dump.sql"
-      ((,) <$> (getRows =<< execute multiArgQuery)
-           <*> (getRows =<< execute doublerQuery))
+      ((,,)
+        <$> (getRows =<< execute multiArgQuery)
+        <*> (getRows =<< execute doublerQuery)
+        <*> (getRows =<< executeParams manyParamsQuery (12, 7.3, "foo"))
+      )
       `shouldReturn` ([Only (Just 25)]
-                     ,[Only (Just 2)])
+                     ,[Only (Just 2)]
+                     ,[Only (Just "foo")])
