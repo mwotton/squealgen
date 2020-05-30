@@ -25,7 +25,7 @@ testwatch: initdb_exists
 # todo: bomb out if `schema` doesn't exist.
 %.hs: %.dump.sql squealgen
 
-	$(eval db := $(shell pg_tmp))
+	$(eval db := $(shell vendor/pg_tmp))
 	@echo $(db)
 	$(eval schema := $(shell cat $(@D)/schema))
 	$(eval tmp := $(shell mktemp /tmp/squealgen.XXXXXX))
