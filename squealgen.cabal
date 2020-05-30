@@ -1,0 +1,85 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: f37117f58e8819eef9a65c64a5207447fe12af8b9be4752302044430f9f58efb
+
+name:           squealgen
+version:        0.1.0.0
+synopsis:       generate squeal types from an existing database
+description:    Please see the README on GitHub at <https://github.com/mwotton/squealgen#readme>
+category:       Database
+homepage:       https://github.com/mwotton/squealgen#readme
+bug-reports:    https://github.com/mwotton/squealgen/issues
+author:         Mark Wotton
+maintainer:     mwotton@gmail.com
+copyright:      2020 Mark Wotton
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+    squealgen
+data-files:
+    squealgen.sql
+
+source-repository head
+  type: git
+  location: https://github.com/mwotton/squealgen
+
+library
+  exposed-modules:
+      Paths_squealgen
+  build-depends:
+      base >=4.7 && <5
+  default-language: Haskell2010
+
+test-suite tests
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Arrays.DBSpec
+      Arrays.Schema
+      Basic.DBSpec
+      Basic.Schema
+      ComplexPrimary.DBSpec
+      ComplexPrimary.Schema
+      DBHelpers
+      Domains.DBSpec
+      Domains.Schema
+      Enums.DBSpec
+      Enums.Schema
+      Extensions.DBSpec
+      Extensions.Schema
+      Functions.DBSpec
+      Functions.Schema
+      InetArrays.DBSpec
+      InetArrays.Schema
+      Members.DBSpec
+      Members.Schema
+      NoConstraints.DBSpec
+      NoConstraints.Schema
+      Views.DBSpec
+      Views.Schema
+      Paths_squealgen
+  hs-source-dirs:
+      test
+  default-extensions: DataKinds DeriveGeneric OverloadedLabels FlexibleContexts TypeApplications TypeOperators GADTs
+  build-depends:
+      base >=4.7 && <5
+    , bytestring
+    , containers
+    , generics-sop
+    , hspec
+    , hspec-expectations-lifted
+    , mtl
+    , network-ip
+    , postgresql-binary
+    , squeal-postgresql
+    , text
+    , tmp-postgres
+    , unliftio
+  default-language: Haskell2010
