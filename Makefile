@@ -28,5 +28,8 @@ testwatch: initdb_exists
 	$(eval db := $(shell pg_tmp))
 	@echo $(db)
 	$(eval schema := $(shell cat $(@D)/schema))
-	psql -d $(db) < $< && ./squealgen $(db) "$(patsubst test/%,%,$(*D)).$(*F)" $(schema)  > $@
+	$(eval tmp := $(shell mktemp /tmp/squealgen.XXXXXX))
+	@echo $(tmp)
+	psql -d $(db) < $< && ./squealgen $(db) "$(patsubst test/%,%,$(*D)).$(*F)" $(schema)  > $(tmp)
+	./check_schema $(tmp) $@
         # an unprincipled hack: we tag the db connstr in the directory

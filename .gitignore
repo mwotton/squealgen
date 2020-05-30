@@ -1,6 +1,5 @@
 .stack-work/
 squealgen.cabal
-Schema.hs
 .hspec-failures
 TAGS
 .#*

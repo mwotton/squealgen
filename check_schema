@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+tmp=$1
+existing=$2
+
+if [ -f $existing ]; then
+	diff $tmp $existing >/dev/null;
+	if [ $? -ne 0 ]; then
+		echo "file $tmp doesn't match $existing";
+		exit 1;
+	fi;
+fi;
+cp "$tmp" "$existing";
