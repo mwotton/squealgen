@@ -186,7 +186,7 @@ create temporary view constraintDefs as (
 
 select coalesce(string_agg(allDefs.tabData, E'\n'),'') as defs,
        format(E'type Tables = (''[\n   %s]  :: [(Symbol,SchemumType)])',
-         coalesce(string_agg(format('"%s" ::: ''Table %sTable', allDefs.table_name, allDefs.cappedName), E'\n  ,'),'')) as schem
+         coalesce(string_agg(format('"%s" ::: ''Table %sTable', allDefs.table_name, allDefs.cappedName), E'\n  ,' order by allDefs.table_name ),'')) as schem
 
 from (
   select format(E'type %1$sColumns = %2$s\ntype %1$sConstraints = ''[%3$s]\ntype %1$sTable = %1$sConstraints :=> %1$sColumns\n',
@@ -197,7 +197,8 @@ from (
 	 defs.table_name
 from (select table_name, string_agg(columnDefs.haskCols, E'\n  ,') as cols
       from columnDefs
-      group by table_name) defs
+      group by table_name
+      order by table_name) defs
 left join (select table_name,
              string_agg(format('"%s" ::: %s',constraintDefs.conname,
 	       case contype
@@ -205,9 +206,12 @@ left join (select table_name,
 	       when 'f' then format('''ForeignKey ''["%s"] "%s" ''["%s"]', array_to_string(fk,'","'), tab, array_to_string(reffields, '","'))
 	       else pg_temp.croak (format('bad type %s',contype))
 	       end)
-			, E'\n  ,') as str
-from constraintDefs  group by table_name) cd on cd.table_name = defs.table_name
-group by defs.table_name) allDefs \gset
+			, E'\n  ,' order by constraintDefs.conname) as str
+from constraintDefs
+group by table_name
+order by table_name ) cd on cd.table_name = defs.table_name
+group by defs.table_name
+order by defs.table_name) allDefs \gset
 
 \echo -- schema
 \echo :schem
@@ -233,7 +237,9 @@ FROM pg_catalog.pg_attribute a join pg_catalog.pg_class c on a.attrelid = c.oid
  join pg_catalog.pg_namespace n on n.oid = c.relnamespace
  join pg_catalog.pg_type t on a.atttypid=t.oid
  where c.relkind='v' and n.nspname=:'chosen_schema'
- AND a.attnum > 0 AND NOT a.attisdropped group by c.relname);
+ AND a.attnum > 0 AND NOT a.attisdropped
+ group by c.relname
+ order by c.relname);
 
 -- select coalesce(string_agg(allDefs.tabData, E'\n'),'') as defs,
 select format( E'type Views = \n  ''[%s]\n', coalesce(string_agg(format('"%s" ::: ''View %sView', viewname, pg_temp.initCaps(viewname)), ',')), '') as viewtype,
@@ -280,14 +286,17 @@ from
 join pg_type type_arg on funcs.arg=type_arg.oid -- internal args are never usable from sql.
 where type_arg.typtype <> 'p'
 group by proname,
-	 ret_type ) funcdefs \gset
+	 ret_type
+order by proname
+
+	 ) funcdefs \gset
 \echo :functions
 
 SELECT format('type Domains = ''[%s]',
          coalesce(string_agg(format(E'"%s" ::: ''Typedef PG%s',
 	 				   pg_type.typname, p2.typname  ),
 			E'\n   ,' ), '')) as domains,
-       coalesce(string_agg(format ('type PG%s = PG%s', pg_type.typname, p2.typname ) , E'\n'), '') as decls
+       coalesce(string_agg(format ('type PG%s = PG%s', pg_type.typname, p2.typname ) , E'\n' order by pg_type.typname asc, p2.typname asc), '') as decls
 FROM pg_catalog.pg_type
 JOIN pg_catalog.pg_namespace ON pg_namespace.oid = pg_type.typnamespace
 join pg_catalog.pg_type p2 on pg_type.typbasetype = p2.oid
