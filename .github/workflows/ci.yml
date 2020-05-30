@@ -9,12 +9,12 @@ on:
 jobs:
   stack:
     name: stack / ghc ${{ matrix.ghc }}
-    runs-on: ubuntu-latest
+    # runs-on: ubuntu-latest
     strategy:
       matrix:
         stack: ["2.1.3"]
         ghc: ["8.8.3"]
-        os: [ubuntu-latest, macOS-latest, windows-latest]
+        os: [ubuntu-latest, macOS-latest]
     steps:
     - uses: actions/checkout@v2
       if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/master'
