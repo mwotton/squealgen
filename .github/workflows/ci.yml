@@ -9,9 +9,7 @@ on:
 jobs:
   stack:
     name: stack / ghc ${{ matrix.ghc }}
-    runs-on:
-      - ubuntu-latest
-      - macOS-latest
+    runs-on:  ${{ matrix.os }}
     strategy:
       matrix:
         stack: ["2.1.3"]
