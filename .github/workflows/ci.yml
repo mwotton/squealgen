@@ -21,7 +21,7 @@ jobs:
 
     - name: install postgresql
       run: |
-        apt install postgresql-10
+        sudo apt install postgresql-10
 
     - uses: actions/setup-haskell@v1.1
       name: Setup Haskell Stack
