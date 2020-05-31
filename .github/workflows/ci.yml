@@ -40,11 +40,6 @@ jobs:
       run : |
         touch squealgen.sql
 
-    - name: Test-mac
-      if: ${{ matrix.os == 'macOS-latest' }}
-      run: |
-        find / -iname initdb
-
     - name: Test
       run: |
         PATH=/usr/lib/postgresql/10/bin:$PATH make test
