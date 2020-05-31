@@ -37,5 +37,4 @@ jobs:
 
     - name: Test
       run: |
-        rm squealgen.sql
-        PATH=/usr/lib/postgresql/10/bin:$PATH make test
+        rm squealgen.sql; PATH=/usr/lib/postgresql/10/bin:$PATH make test
