@@ -29,6 +29,7 @@ jobs:
       with:
         ghc-version: ${{ matrix.ghc }}
         stack-version: ${{ matrix.stack }}
+        enable-stack: true
 
     - uses: actions/cache@v1
       name: Cache ~/.stack
