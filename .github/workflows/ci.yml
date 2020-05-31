@@ -24,12 +24,6 @@ jobs:
       run: |
         sudo apt install postgresql-10
 
-    - name: install postgresql on mac
-      if: ${{ matrix.os == 'macOS-latest' }}
-      run: |
-        brew install postgresql
-
-
     - uses: actions/setup-haskell@v1.1
       name: Setup Haskell Stack
       with:
@@ -42,6 +36,15 @@ jobs:
         path: ~/.stack
         key: ${{ runner.os }}-${{ matrix.ghc }}-stack
 
+    - name: Ensure rebuild
+      run : |
+        touch squealgen.sql
+
+    - name: Test-mac
+      if: ${{ matrix.os == 'macOS-latest' }}
+      run: |
+        find / -iname initdb
+
     - name: Test
       run: |
-        touch squealgen.sql; PATH=/usr/lib/postgresql/10/bin:$PATH make test
+        PATH=/usr/lib/postgresql/10/bin:$PATH make test
