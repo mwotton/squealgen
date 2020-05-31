@@ -2,6 +2,8 @@
 
 Generate squeal types from a running database.
 
+![CI](https://github.com/mwotton/squealgen/workflows/CI/badge.svg)
+
 ## why?
 
 [Squeal](https://hackage.haskell.org/package/squeal-postgresql) is a lovely way to interact with a database, but setting up the initial schema is a struggle.
