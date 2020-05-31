@@ -8,7 +8,7 @@ on:
 
 jobs:
   stack:
-    name: stack / ghc ${{ matrix.ghc }}
+    name: ${{ matrix.os }}-${{ matrix.ghc }}-stack
     runs-on:  ${{ matrix.os }}
     strategy:
       matrix:
