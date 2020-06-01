@@ -178,10 +178,13 @@ create temporary view constraintDefs as (
       FROM pg_catalog.pg_constraint r
       join pg_catalog.pg_class c
         on r.conrelid=c.oid
+      join pg_catalog.pg_namespace n
+        on n.oid = r.connamespace		
 	-- we don't look up checks, because we'd then have to be able to translate arbitrary
 	-- expressions in sql and translate them to squeal's type structure. ain't nobody
 	-- got time for that.
-      WHERE r.contype = 'f' or r.contype = 'p'
+      WHERE (r.contype = 'f' or r.contype = 'p')
+      AND n.nspname=:'chosen_schema' 
       ORDER BY 1) rawCons) blah);
 
 select coalesce(string_agg(allDefs.tabData, E'\n'),'') as defs,
