@@ -137,7 +137,9 @@ join (select columns.*,
 		 -- nb: we are assuming the inner array may be nullable. this may not be true, TODO
 		 pg_temp.type_decl_from(data_type, udt_name, false, character_maximum_length)
 		 ) as colDef
-  from columns) mycolumns on mycolumns.table_name = tables.table_name
+  from columns
+  where columns.table_schema = :'chosen_schema'
+  ) mycolumns on mycolumns.table_name = tables.table_name
 
 WHERE table_type = 'BASE TABLE'
   AND tables.table_schema = :'chosen_schema' --  NOT IN ('pg_catalog', 'information_schema')
