@@ -32,17 +32,17 @@ create or replace function pg_temp.type_decl_from(data_type text, udt_name text,
 	-- probably better to move it to just the basic tables.
     when (data_type = 'ARRAY' or data_type = 'A') then
       format('(PGvararray (%s %s))'
-            , case when nullable then 'Null' else 'NotNull' end
-            , case when udt_name = '_varchar' and fieldlen is null then 'PGtext'
-	           when udt_name = '_varchar' then format('(PGvarchar %s)', fieldlen)
-	           else 'PG' || (trim(leading '_' from udt_name::text))
-              end)
+	    , case when nullable then 'Null' else 'NotNull' end
+	    , case when udt_name = '_varchar' and fieldlen is null then 'PGtext'
+		   when udt_name = '_varchar' then format('(PGvarchar %s)', fieldlen)
+		   else 'PG' || (trim(leading '_' from udt_name::text))
+	      end)
     else
       (case
 	 -- this won't work for everything - should check if it's got a max length.
 	 --                    when udt_name = 'varchar' then 'PGtext'
 	 when udt_name = 'varchar' and fieldlen is null then 'PGtext'
-         when udt_name = 'varchar' then format('(PGvarchar %s)', fieldlen)
+	 when udt_name = 'varchar' then format('(PGvarchar %s)', fieldlen)
 	 else ('PG' || (udt_name :: text))
 	 end)
     end);
@@ -61,14 +61,14 @@ LANGUAGE plpgsql;
 -- Create a function that always returns the first non-NULL item
 CREATE OR REPLACE FUNCTION pg_temp.first_agg ( anyelement, anyelement )
 RETURNS anyelement LANGUAGE SQL IMMUTABLE STRICT AS $$
-        SELECT $1;
+	SELECT $1;
 $$;
- 
+
 -- And then wrap an aggregate around it
 CREATE AGGREGATE pg_temp.FIRST (
-        sfunc    = pg_temp.first_agg,
-        basetype = anyelement,
-        stype    = anyelement
+	sfunc    = pg_temp.first_agg,
+	basetype = anyelement,
+	stype    = anyelement
 );
 
 -- PRAGMAS of DOOM
@@ -105,7 +105,7 @@ select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
 -- now we emit all the enumerations
 with enumerations as  (select
        format(E'type PG%s = ''PGenum\n  ''[%s]',
-       		            t.typname,
+			    t.typname,
 			    string_agg(format('"%s"', e.enumlabel), ', ' order by e.enumsortorder)) as line,
        format(E'"%1$s" ::: ''Typedef PG%1$s', t.typname) as decl
 from pg_type t
@@ -116,7 +116,7 @@ from pg_type t
    order by (t.typname :: text COLLATE "C"))
  select coalesce(string_agg(enumerations.line, E'\n'),'') as enums,
        format(E'type Enums =\n  (''[%s] :: [(Symbol,SchemumType)])',
-              coalesce(string_agg(enumerations.decl, E',\n  '), '')) as decl
+	      coalesce(string_agg(enumerations.decl, E',\n  '), '')) as decl
 from enumerations \gset
 \echo -- enums
 \echo :enums
@@ -131,13 +131,13 @@ create temporary view columnDefs as (SELECT tables.table_name,
 			 ) as haskCols
 FROM tables
 join (select columns.*,
-            format('"%s" ::: %s :=> %s %s',
+	    format('"%s" ::: %s :=> %s %s',
 	      column_name,
 	      case when column_default is null then '''NoDef'    else '''Def' end,
 	      (case is_nullable
-	         when 'YES' then '''Null'
-	         when  'NO' then '''NotNull'
-	         else pg_temp.croak ('is_nullable broken somehow: ' || is_nullable)
+		 when 'YES' then '''Null'
+		 when  'NO' then '''NotNull'
+		 else pg_temp.croak ('is_nullable broken somehow: ' || is_nullable)
 		 end ),
 		 -- nb: we are assuming the inner array may be nullable. this may not be true, TODO
 		 pg_temp.type_decl_from(data_type, udt_name, false, character_maximum_length)
@@ -149,12 +149,12 @@ join (select columns.*,
 WHERE table_type = 'BASE TABLE'
   AND tables.table_schema = :'chosen_schema' --  NOT IN ('pg_catalog', 'information_schema')
 group by tables.table_catalog,
-         tables.table_schema,
-         tables.table_name,
-         tables.table_type,
+	 tables.table_schema,
+	 tables.table_name,
+	 tables.table_type,
 	 tables.self_referencing_column_name,
 	 tables.reference_generation,
-         tables.user_defined_type_catalog,
+	 tables.user_defined_type_catalog,
 	 tables.user_defined_type_schema,
 	 tables.user_defined_type_name,
 	 tables.is_insertable_into,
@@ -166,8 +166,8 @@ order by tables.table_name COLLATE "C"
 create temporary view constraintDefs as (
 
   select regexp_split_to_array(trim(both '()'
-                                    from replace(fk, ' ','')),',') as fk,
-         split_part(target, '(', 1) as tab,
+				    from replace(fk, ' ','')),',') as fk,
+	 split_part(target, '(', 1) as tab,
 	 (select pg_temp.stripDoublequotes(regexp_split_to_array(split_part(target, '(', 2)::text, E', '::text))) as reffields,
 	 conname,
 	 table_name,
@@ -175,33 +175,33 @@ create temporary view constraintDefs as (
 	 (select pg_temp.stripDoublequotes(regexp_split_to_array(pkeytable, ' *, *'))) as pkeys
   from
     (select regexp_replace(split_part(split_part(condef, 'FOREIGN KEY ', 2), 'REFERENCES', 1), '"', '', 'g') as fk,
-            regexp_replace(split_part(split_part(condef, 'REFERENCES ', 2), ')', 1), '"', '', 'g') as target,
+	    regexp_replace(split_part(split_part(condef, 'REFERENCES ', 2), ')', 1), '"', '', 'g') as target,
 	    split_part(split_part(condef, 'PRIMARY KEY (',2), ')', 1) as pkeytable,
 	    *
      from
   (SELECT conname,contype,
-             pg_catalog.pg_get_constraintdef(r.oid, false) as condef,
+	     pg_catalog.pg_get_constraintdef(r.oid, false) as condef,
 	     c.relname as table_name
       FROM pg_catalog.pg_constraint r
       join pg_catalog.pg_class c
-        on r.conrelid=c.oid
+	on r.conrelid=c.oid
       join pg_catalog.pg_namespace n
-        on n.oid = r.connamespace		
+	on n.oid = r.connamespace
 	-- we don't look up checks, because we'd then have to be able to translate arbitrary
 	-- expressions in sql and translate them to squeal's type structure. ain't nobody
 	-- got time for that.
       WHERE (r.contype = 'f' or r.contype = 'p')
-      AND n.nspname=:'chosen_schema' 
+      AND n.nspname=:'chosen_schema'
       ORDER BY 1) rawCons) blah);
 
 select coalesce(string_agg(allDefs.tabData, E'\n'),'') as defs,
        format(E'type Tables = (''[\n   %s]  :: [(Symbol,SchemumType)])',
-         coalesce(string_agg(format('"%s" ::: ''Table %sTable', allDefs.table_name, allDefs.cappedName), E'\n  ,' order by allDefs.table_name COLLATE "C" ),'')) as schem
+	 coalesce(string_agg(format('"%s" ::: ''Table %sTable', allDefs.table_name, allDefs.cappedName), E'\n  ,' order by allDefs.table_name COLLATE "C" ),'')) as schem
 
 from (
   select format(E'type %1$sColumns = %2$s\ntype %1$sConstraints = ''[%3$s]\ntype %1$sTable = %1$sConstraints :=> %1$sColumns\n',
-               replace(initcap(replace(defs.table_name, '_', ' ')), ' ', ''),
-    	       string_agg(defs.cols, 'XXXXX'), -- this shouldn't be necessary
+	       replace(initcap(replace(defs.table_name, '_', ' ')), ' ', ''),
+	       string_agg(defs.cols, 'XXXXX'), -- this shouldn't be necessary
 	       string_agg(cd.str, 'YYYYY')) as tabData,
 	 replace(initcap(replace(defs.table_name, '_', ' ')), ' ', '') as cappedName,
 	 defs.table_name
@@ -210,7 +210,7 @@ from (select table_name, string_agg(columnDefs.haskCols, E'\n  ,') as cols
       group by table_name
       order by table_name COLLATE "C") defs
 left join (select table_name,
-             string_agg(format('"%s" ::: %s',constraintDefs.conname,
+	     string_agg(format('"%s" ::: %s',constraintDefs.conname,
 	       case contype
 	       when 'p' then format('''PrimaryKey ''["%s"]', array_to_string(pkeys, '","'))
 	       when 'f' then format('''ForeignKey ''["%s"] "%s" ''["%s"]', array_to_string(fk,'","'), tab, array_to_string(reffields, '","'))
@@ -264,32 +264,32 @@ select format(E'type Functions = \n  ''[ %s ]'
      , coalesce(string_agg(funcdefs.stringform, E'\n   , ' order by (funcdefs.proname :: text) COLLATE "C"), '')) as functions
 from
   (select format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null PG%s) )'
-          , funcs.proname
+	  , funcs.proname
 	  , string_agg(format('%s %s', (case
 				 when proisstrict then 'NotNull'
 				 else 'Null'
 			     end), pg_temp.type_decl_from(type_arg.typcategory,type_arg.typname,false,null)) -- fixme
 			     , ',  ' order by arg_index)
-          , ret_type) as stringform
+	  , ret_type) as stringform
 	  , funcs.proname
    from
      (select proname,
-     	     pronamespace,
+	     pronamespace,
 	     proisstrict,
 	     typname,
 	     args.arg,
 	     args.arg_index,
 	     type_ret.typname as ret_type
       from (select proname,
-                   pg_temp.FIRST(pronamespace) as pronamespace,
+		   pg_temp.FIRST(pronamespace) as pronamespace,
 		   pg_temp.FIRST(proargtypes) as proargtypes,
 		   pg_temp.FIRST(proisstrict) as proisstrict,
-   		   pg_temp.FIRST(prorettype) as prorettype
+		   pg_temp.FIRST(prorettype) as prorettype
 	    from pg_proc
 	    group by proname
 	    having count(proname)=1 ) p
-      	   -- need ordinality to keep function argument ordering correct
-          ,unnest(p.proargtypes) with  ordinality as args(arg,arg_index)
+	   -- need ordinality to keep function argument ordering correct
+	  ,unnest(p.proargtypes) with  ordinality as args(arg,arg_index)
 	  ,pg_namespace ns
 	  ,pg_type type_ret
 	  WHERE p.pronamespace = ns.oid
@@ -300,12 +300,12 @@ from
 	  -- we will still want to ignore all other pseudotypes
 	  -- but records will be ok eventually.
 	  AND type_ret.typtype <> 'p'
-	  
+
 	  ) as funcs
 join pg_type type_arg on funcs.arg=type_arg.oid -- internal args are never usable from sql.
 group by proname,
 	 ret_type
-having (bool_and(type_arg.typtype <> 'p'))	 
+having (bool_and(type_arg.typtype <> 'p'))
 order by (proname :: text) COLLATE "C"
 
 	 ) funcdefs \gset
@@ -314,8 +314,8 @@ order by (proname :: text) COLLATE "C"
 \echo :functions
 
 SELECT format('type Domains = ''[%s]',
-         coalesce(string_agg(format(E'"%s" ::: ''Typedef PG%s',
-	 				   pg_type.typname, p2.typname  ),
+	 coalesce(string_agg(format(E'"%s" ::: ''Typedef PG%s',
+					   pg_type.typname, p2.typname  ),
 			E'\n   ,' ), '')) as domains,
        coalesce(string_agg(format ('type PG%s = PG%s', pg_type.typname, p2.typname ) , E'\n' order by (pg_type.typname :: text) COLLATE "C" asc, (p2.typname :: text) COLLATE "C" asc), '') as decls
 FROM pg_catalog.pg_type
