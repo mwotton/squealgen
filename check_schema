@@ -7,7 +7,7 @@ if [ -f $existing ]; then
         diff --suppress-common-lines $tmp $existing ;
 	if [ $? -ne 0 ]; then
 		echo "file $tmp doesn't match $existing";
-		exit 1;
+		#  exit 1;
 	fi;
 fi;
 cp "$tmp" "$existing";
