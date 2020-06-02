@@ -56,15 +56,20 @@ begin
 end;
 $$
 LANGUAGE plpgsql;
--- CREATE or replace FUNCTION pg_temp.is_pseudotype(field text) RETURNS bool] AS $$
--- begin
-
---    return array_agg(regexp_replace(component.f, '"+', '', 'g')) from unnest(arr) as component(f);
--- end;
 
 
-
-
+-- Create a function that always returns the first non-NULL item
+CREATE OR REPLACE FUNCTION pg_temp.first_agg ( anyelement, anyelement )
+RETURNS anyelement LANGUAGE SQL IMMUTABLE STRICT AS $$
+        SELECT $1;
+$$;
+ 
+-- And then wrap an aggregate around it
+CREATE AGGREGATE pg_temp.FIRST (
+        sfunc    = pg_temp.first_agg,
+        basetype = anyelement,
+        stype    = anyelement
+);
 
 -- PRAGMAS of DOOM
 \echo {-# LANGUAGE DataKinds #-}
@@ -275,7 +280,14 @@ from
 	     args.arg,
 	     args.arg_index,
 	     type_ret.typname as ret_type
-      from pg_proc p
+      from (select proname,
+                   pg_temp.FIRST(pronamespace) as pronamespace,
+		   pg_temp.FIRST(proargtypes) as proargtypes,
+		   pg_temp.FIRST(proisstrict) as proisstrict,
+   		   pg_temp.FIRST(prorettype) as prorettype
+	    from pg_proc
+	    group by proname
+	    having count(proname)=1 ) p
       	   -- need ordinality to keep function argument ordering correct
           ,unnest(p.proargtypes) with  ordinality as args(arg,arg_index)
 	  ,pg_namespace ns
@@ -287,7 +299,9 @@ from
 	  -- so we'll just avoid generating anything for them.
 	  -- we will still want to ignore all other pseudotypes
 	  -- but records will be ok eventually.
-	  AND type_ret.typtype <> 'p') as funcs
+	  AND type_ret.typtype <> 'p'
+	  
+	  ) as funcs
 join pg_type type_arg on funcs.arg=type_arg.oid -- internal args are never usable from sql.
 where type_arg.typtype <> 'p'
 group by proname,
@@ -295,6 +309,8 @@ group by proname,
 order by (proname :: text) COLLATE "C"
 
 	 ) funcdefs \gset
+
+
 \echo :functions
 
 SELECT format('type Domains = ''[%s]',
