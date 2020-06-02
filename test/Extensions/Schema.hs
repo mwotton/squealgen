@@ -56,8 +56,6 @@ type Functions =
    , "_ltxtq_exec" ::: Function ('[ NotNull (PGvararray (NotNull PGltree)),  NotNull PGltxtquery ] :=> 'Returns ( 'Null PGbool) )
    , "_ltxtq_extract_exec" ::: Function ('[ NotNull (PGvararray (NotNull PGltree)),  NotNull PGltxtquery ] :=> 'Returns ( 'Null PGltree) )
    , "_ltxtq_rexec" ::: Function ('[ NotNull PGltxtquery,  NotNull (PGvararray (NotNull PGltree)) ] :=> 'Returns ( 'Null PGbool) )
-   , "index" ::: Function ('[ NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGint4 ] :=> 'Returns ( 'Null PGint4) )
-   , "lca" ::: Function ('[ NotNull PGltree,  NotNull (PGvararray (NotNull PGltree)),  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree,  NotNull PGltree ] :=> 'Returns ( 'Null PGltree) )
    , "lt_q_regex" ::: Function ('[ NotNull PGltree,  NotNull (PGvararray (NotNull PGlquery)) ] :=> 'Returns ( 'Null PGbool) )
    , "lt_q_rregex" ::: Function ('[ NotNull (PGvararray (NotNull PGlquery)),  NotNull PGltree ] :=> 'Returns ( 'Null PGbool) )
    , "ltq_regex" ::: Function ('[ NotNull PGltree,  NotNull PGlquery ] :=> 'Returns ( 'Null PGbool) )
@@ -81,7 +79,6 @@ type Functions =
    , "ltxtq_rexec" ::: Function ('[ NotNull PGltxtquery,  NotNull PGltree ] :=> 'Returns ( 'Null PGbool) )
    , "nlevel" ::: Function ('[ NotNull PGltree ] :=> 'Returns ( 'Null PGint4) )
    , "subltree" ::: Function ('[ NotNull PGltree,  NotNull PGint4,  NotNull PGint4 ] :=> 'Returns ( 'Null PGltree) )
-   , "subpath" ::: Function ('[ NotNull PGltree,  NotNull PGltree,  NotNull PGint4,  NotNull PGint4,  NotNull PGint4 ] :=> 'Returns ( 'Null PGltree) )
    , "text2ltree" ::: Function ('[ NotNull PGtext ] :=> 'Returns ( 'Null PGltree) ) ]
 type Domains = '[]
 
