@@ -303,9 +303,9 @@ from
 	  
 	  ) as funcs
 join pg_type type_arg on funcs.arg=type_arg.oid -- internal args are never usable from sql.
-where type_arg.typtype <> 'p'
 group by proname,
 	 ret_type
+having (bool_and(type_arg.typtype <> 'p'))	 
 order by (proname :: text) COLLATE "C"
 
 	 ) funcdefs \gset
