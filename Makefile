@@ -28,8 +28,9 @@ testwatch: initdb_exists
 	$(eval db := $(shell vendor/pg_tmp))
 	@echo $(db)
 	$(eval schema := $(shell cat $(@D)/schema))
+	$(eval extra_imports := $(shell cat $(@D)/extra_imports))
 	$(eval tmp := $(shell mktemp /tmp/squealgen.XXXXXX))
 	@echo $(tmp)
-	psql -d $(db) < $< && ./squealgen $(db) "$(patsubst test/%,%,$(*D)).$(*F)" $(schema)  > $(tmp)
+	psql -d $(db) < $< && ./squealgen $(db) "$(patsubst test/%,%,$(*D)).$(*F)" $(schema) $(extra_imports) > $(tmp)
 	./check_schema $(tmp) $@
         # an unprincipled hack: we tag the db connstr in the directory

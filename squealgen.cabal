@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f37117f58e8819eef9a65c64a5207447fe12af8b9be4752302044430f9f58efb
+-- hash: d8d59b17fda7cd868752b8d0d00a468ed7ae0bf3b841a350483b32d1a25372d0
 
 name:           squealgen
 version:        0.1.0.0
@@ -33,8 +33,12 @@ source-repository head
 library
   exposed-modules:
       Paths_squealgen
+      LTree
+  hs-source-dirs:
+      src
   build-depends:
       base >=4.7 && <5
+    , squeal-postgresql
   default-language: Haskell2010
 
 test-suite tests
@@ -79,6 +83,7 @@ test-suite tests
     , network-ip
     , postgresql-binary
     , squeal-postgresql
+    , squealgen
     , text
     , tmp-postgres
     , unliftio

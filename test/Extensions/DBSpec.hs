@@ -6,7 +6,7 @@ module Extensions.DBSpec where
 
 import           Data.Int
 import           DBHelpers         (runSession)
-import           Functions.Schema
+import           Extensions.Schema
 import qualified Generics.SOP      as SOP
 import qualified GHC.Generics      as GHC
 import           Squeal.PostgreSQL

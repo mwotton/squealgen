@@ -19,11 +19,13 @@ description:         Please see the README on GitHub at <https://github.com/mwot
 
 dependencies:
 - base >= 4.7 && < 5
+- squeal-postgresql
 
-# just a stub
 library:
+  source-dirs: src
   exposed-modules:
   - Paths_squealgen
+  - LTree
 
 data-files:
 - squealgen.sql
@@ -48,6 +50,7 @@ tests:
     - squeal-postgresql
     - unliftio
     - generics-sop
+    - squealgen
     - text
     - tmp-postgres
     - containers

@@ -86,14 +86,12 @@ CREATE AGGREGATE pg_temp.FIRST (
 \echo module :modulename where
 \echo import Squeal.PostgreSQL
 \echo import GHC.TypeLits(Symbol)
-\echo
-\echo '-- squeal doesn''t yet support cidr or ltree, so for the moment we emit them explicitly'
-\echo type PGcidr = UnsafePGType "cidr"
+-- specified imports
+select coalesce(string_agg(format('import %s', s.i)  , E'\n'), '') as imports
+from unnest(string_to_array(:'extra_imports', ',')) as s(i) \gset
+\echo :imports
 
--- should really move these out somehow
-\echo type PGltree = UnsafePGType "ltree"
-\echo type PGltxtquery = UnsafePGType "ltxtquery"
-\echo type PGlquery = UnsafePGType "lquery"
+\echo
 
 select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
 \echo
@@ -101,6 +99,7 @@ select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
 \echo
 --\echo type Schema = Join (Join Tables Enums) Views
 \echo type Schema = Join Tables (Join Views (Join Enums (Join Functions Domains)))
+
 
 -- now we emit all the enumerations
 with enumerations as  (select
