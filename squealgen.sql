@@ -162,36 +162,47 @@ group by tables.table_catalog,
 order by tables.table_name COLLATE "C"
 	 );
 
-create temporary view constraintDefs as (
 
-  select regexp_split_to_array(trim(both '()'
-				    from replace(fk, ' ','')),',') as fk,
-	 split_part(target, '(', 1) as tab,
-	 (select pg_temp.stripDoublequotes(regexp_split_to_array(split_part(target, '(', 2)::text, E', '::text))) as reffields,
-	 conname,
-	 table_name,
-	 contype,
-	 (select pg_temp.stripDoublequotes(regexp_split_to_array(pkeytable, ' *, *'))) as pkeys
-  from
-    (select regexp_replace(split_part(split_part(condef, 'FOREIGN KEY ', 2), 'REFERENCES', 1), '"', '', 'g') as fk,
-	    regexp_replace(split_part(split_part(condef, 'REFERENCES ', 2), ')', 1), '"', '', 'g') as target,
-	    split_part(split_part(condef, 'PRIMARY KEY (',2), ')', 1) as pkeytable,
-	    *
-     from
-  (SELECT conname,contype,
-	     pg_catalog.pg_get_constraintdef(r.oid, false) as condef,
-	     c.relname as table_name
-      FROM pg_catalog.pg_constraint r
-      join pg_catalog.pg_class c
-	on r.conrelid=c.oid
-      join pg_catalog.pg_namespace n
-	on n.oid = r.connamespace
-	-- we don't look up checks, because we'd then have to be able to translate arbitrary
-	-- expressions in sql and translate them to squeal's type structure. ain't nobody
-	-- got time for that.
-      WHERE (r.contype = 'f' or r.contype = 'p')
-      AND n.nspname=:'chosen_schema'
-      ORDER BY 1) rawCons) blah);
+create temporary view constraintDefs as (
+SELECT
+  con.conname AS conname,
+  con.contype AS contype,
+  nsp.nspname AS nsp,
+  tab.relname AS table_name,
+  COALESCE (
+    array_agg (
+      ALL col.attname ORDER BY array_position(con.conkey, col.attnum) ASC
+    ) FILTER (WHERE col.attname IS NOT NULL),
+    ARRAY[] :: text[]
+  ) as cols,
+  fnsp.nspname AS fnsp,
+  ftab.relname AS ftab,
+  array_agg (
+    ALL fcol.attname ORDER BY array_position(con.confkey, fcol.attnum) ASC
+  ) FILTER (WHERE fcol.attname IS NOT NULL) AS fcols
+FROM pg_catalog.pg_constraint AS con
+INNER JOIN pg_catalog.pg_class AS tab
+ON con.conrelid = tab.oid
+INNER JOIN pg_catalog.pg_namespace AS nsp
+ON con.connamespace = nsp.oid
+LEFT OUTER JOIN pg_catalog.pg_attribute AS col
+ON con.conkey @> ARRAY[col.attnum] AND con.conrelid = col.attrelid
+LEFT OUTER JOIN pg_catalog.pg_class AS ftab
+ON con.confrelid = ftab.oid
+LEFT OUTER JOIN pg_catalog.pg_namespace AS fnsp
+ON ftab.relnamespace = fnsp.oid
+LEFT OUTER JOIN pg_catalog.pg_attribute AS fcol
+ON con.confkey @> ARRAY[fcol.attnum] AND con.confrelid = fcol.attrelid
+WHERE con.contype IN ('f', 'c', 'p', 'u')
+GROUP BY
+  con.conname,
+  con.contype,
+  nsp.nspname,
+  tab.relname,
+  fnsp.nspname,
+  ftab.relname
+);
+
 
 select coalesce(string_agg(allDefs.tabData, E'\n'),'') as defs,
        format(E'type Tables = (''[\n   %s]  :: [(Symbol,SchemumType)])',
@@ -211,8 +222,8 @@ from (select table_name, string_agg(columnDefs.haskCols, E'\n  ,') as cols
 left join (select table_name,
 	     string_agg(format('"%s" ::: %s',constraintDefs.conname,
 	       case contype
-	       when 'p' then format('''PrimaryKey ''["%s"]', array_to_string(pkeys, '","'))
-	       when 'f' then format('''ForeignKey ''["%s"] "%s" ''["%s"]', array_to_string(fk,'","'), tab, array_to_string(reffields, '","'))
+	       when 'p' then format('''PrimaryKey ''["%s"]', array_to_string(cols, '","'))
+	       when 'f' then format('''ForeignKey ''["%s"] "%s" ''["%s"]', array_to_string(cols,'","'), ftab, array_to_string(fcols, '","'))
 	       else pg_temp.croak (format('bad type %s',contype))
 	       end)
 			, E'\n  ,' order by (constraintDefs.conname ::text) COLLATE "C") as str
