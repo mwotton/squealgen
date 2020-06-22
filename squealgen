@@ -237,6 +237,7 @@ left join (select table_name,
 	       case contype
 	       when 'p' then format('''PrimaryKey ''["%s"]', array_to_string(cols, '","'))
 	       when 'f' then format('''ForeignKey ''["%s"] "%s" ''["%s"]', array_to_string(cols,'","'), ftab, array_to_string(fcols, '","'))
+	       when 'u' then format('''Unique ''["%s"]', array_to_string(cols,'","'))
 	       else pg_temp.croak (format('bad type %s',contype))
 	       end)
 			, E'\n  ,' order by (constraintDefs.conname ::text) COLLATE "C") as str

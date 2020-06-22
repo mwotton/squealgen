@@ -38,8 +38,10 @@ type EmailsConstraints = '["fk_user_id" ::: 'ForeignKey '["user_id"] "users" '["
 type EmailsTable = EmailsConstraints :=> EmailsColumns
 
 type UsersColumns = '["id" ::: 'Def :=> 'NotNull PGint4
-  ,"name" ::: 'NoDef :=> 'NotNull PGtext]
-type UsersConstraints = '["pk_users" ::: 'PrimaryKey '["id"]]
+  ,"name" ::: 'NoDef :=> 'NotNull PGtext
+  ,"key" ::: 'NoDef :=> 'NotNull PGtext]
+type UsersConstraints = '["pk_users" ::: 'PrimaryKey '["id"]
+  ,"uniqueness" ::: 'Unique '["name","key"]]
 type UsersTable = UsersConstraints :=> UsersColumns
 
 -- VIEWS
