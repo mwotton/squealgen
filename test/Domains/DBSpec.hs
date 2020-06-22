@@ -31,14 +31,14 @@ increment = query $ values ((function #increment_positive) (param @1) `as` #from
 
 spec = describe "Domains" $ do
   it "accepts a good value" $ do
-    runSession "./test/Domains/Schema.dump.sql"
+    runSession "./test/Domains/schemas"
       (getRows =<< executeParams validInsert (PositiveInt 1))
       `shouldReturn` []
   it "rejects a bad one" $ do
-    runSession "./test/Domains/Schema.dump.sql"
+    runSession "./test/Domains/schemas"
       (getRows =<< executeParams validInsert (PositiveInt (-1)))
       `shouldThrow` (\(_::SquealException) -> True)
   it "can run a function that takes and returns a domain" $ do
-    runSession "./test/Domains/Schema.dump.sql"
+    runSession "./test/Domains/schemas"
       (getRows =<< executeParams increment (PositiveInt 1))
       `shouldReturn` [Only (Just $ PositiveInt 2)]

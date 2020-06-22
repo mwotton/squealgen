@@ -33,7 +33,7 @@ spec = describe "Arrays" $ do
     'a' `shouldBe` 'a'
 
   it "works" $ do
-    runSession "./test/Views/Schema.dump.sql"
+    runSession "./test/Views/schemas"
       ((,) <$> (getRows =<< execute getEvilView)
            <*> (getRows =<< execute getView))
       `shouldReturn` ([Evil 1337],

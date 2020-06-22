@@ -44,17 +44,19 @@ tests:
     - GADTs
 
     dependencies:
+    - squealgen
+
     - bytestring
+    - containers
+    - directory
+    - generics-sop
     - hspec
     - hspec-expectations-lifted
+    - network-ip
     - squeal-postgresql
-    - unliftio
-    - generics-sop
-    - squealgen
     - text
     - tmp-postgres
-    - containers
-    - network-ip
+    - unliftio
 
     # temp until merge
     - postgresql-binary

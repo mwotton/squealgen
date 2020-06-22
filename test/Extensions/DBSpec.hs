@@ -22,7 +22,7 @@ import           Test.Hspec
 spec = describe "Extensions" $ do
   it "compiles ltree" $ do
     () `shouldBe` ()
-    -- runSession "./test/Functions/Schema.dump.sql"
+    -- runSession "./test/Functions/schemas"
     --   ((,) <$> (getRows =<< execute multiArgQuery)
     --        <*> (getRows =<< execute doublerQuery))
     --   `shouldReturn` ([Only (Just 25)]

@@ -41,7 +41,7 @@ manyParamsQuery = query $
 
 spec = describe "Functions" $ do
   it "doubles things" $ do
-    runSession "./test/Functions/Schema.dump.sql"
+    runSession "./test/Functions/schemas"
       ((,,)
         <$> (getRows =<< execute multiArgQuery)
         <*> (getRows =<< execute doublerQuery)

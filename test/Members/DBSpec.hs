@@ -54,7 +54,7 @@ getUsers = query $ select_
 
 
 spec = describe "Members" $ do
-  it "can run a simple query" $ runSession "./test/Members/Schema.dump.sql" $ do
+  it "can run a simple query" $ runSession "./test/Members/schemas" $ do
     executePrepared_ insertUser users
     fetchedUsers <- getRows =<< execute getUsers
     fetchedUsers `shouldBe` users

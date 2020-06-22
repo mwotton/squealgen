@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d8d59b17fda7cd868752b8d0d00a468ed7ae0bf3b841a350483b32d1a25372d0
+-- hash: 7b219f5427642724daeeac38f8fafba3cd8caa01451538929a30de471f6ab29c
 
 name:           squealgen
 version:        0.1.0.0
@@ -76,6 +76,7 @@ test-suite tests
       base >=4.7 && <5
     , bytestring
     , containers
+    , directory
     , generics-sop
     , hspec
     , hspec-expectations-lifted

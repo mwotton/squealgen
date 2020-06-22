@@ -29,7 +29,7 @@ getLights = query $ select_ (#lights ! #light `as` #fromOnly) (from (table #ligh
 
 spec = describe "Enums" $ do
   it "can fetch enums, and enums from a view" $ do
-    runSession "./test/Enums/Schema.dump.sql"
+    runSession "./test/Enums/schemas"
       ((,) <$> (getRows =<< execute getLights)
            <*> (getRows =<< execute getLightsFromView))
       `shouldReturn` ([Only Red,Only Yellow]
