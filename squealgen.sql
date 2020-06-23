@@ -71,34 +71,11 @@ CREATE AGGREGATE pg_temp.FIRST (
 	stype    = anyelement
 );
 
--- PRAGMAS of DOOM
-\echo {-# LANGUAGE DataKinds #-}
-\echo {-# LANGUAGE DeriveGeneric #-}
-\echo {-# LANGUAGE OverloadedLabels #-}
-\echo {-# LANGUAGE FlexibleContexts #-}
-\echo {-# LANGUAGE OverloadedStrings  #-}
-\echo {-# LANGUAGE PolyKinds  #-}
-\echo {-# LANGUAGE TypeApplications #-}
-\echo {-# LANGUAGE TypeOperators #-}
-\echo {-# LANGUAGE GADTs #-}
-\echo {-# OPTIONS_GHC -fno-warn-unticked-promoted-constructors #-}
-\echo
-\echo module :modulename where
-\echo import Squeal.PostgreSQL
-\echo import GHC.TypeLits(Symbol)
 -- specified imports
 select coalesce(string_agg(format('import %s', s.i)  , E'\n'), '') as imports
 from unnest(string_to_array(:'extra_imports', ',')) as s(i) \gset
-\echo :imports
-
-\echo
 
 select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
-\echo
-\echo :db
-\echo
---\echo type Schema = Join (Join Tables Enums) Views
-\echo type Schema = Join Tables (Join Views (Join Enums (Join Functions Domains)))
 
 
 -- now we emit all the enumerations
@@ -117,10 +94,6 @@ from pg_type t
        format(E'type Enums =\n  (''[%s] :: [(Symbol,SchemumType)])',
 	      coalesce(string_agg(enumerations.decl, E',\n  '), '')) as decl
 from enumerations \gset
-\echo -- enums
-\echo :enums
-\echo -- decls
-\echo :decl
 
 
 
@@ -234,13 +207,6 @@ order by (table_name :: text) COLLATE "C" ) cd on cd.table_name = defs.table_nam
 group by defs.table_name
 order by defs.table_name COLLATE "C") allDefs \gset
 
-\echo -- schema
-\echo :schem
-\echo
-\echo -- defs
-\echo :defs
-
-\echo -- VIEWS
 
 
 create temporary view my_views as (
@@ -266,10 +232,6 @@ FROM pg_catalog.pg_attribute a join pg_catalog.pg_class c on a.attrelid = c.oid
 select format( E'type Views = \n  ''[%s]\n', coalesce(string_agg(format('"%s" ::: ''View %sView', viewname, pg_temp.initCaps(viewname)), ',')), '') as viewtype,
        coalesce (string_agg( format( E'type %sView = \n  ''[%s]\n', pg_temp.initCaps(viewname),views), E'\n'), '') as views
        from my_views \gset
-\echo :viewtype
-\echo :views
-
-\echo -- functions
 
 select format(E'type Functions = \n  ''[ %s ]'
      , coalesce(string_agg(funcdefs.stringform, E'\n   , ' order by (funcdefs.proname :: text) COLLATE "C"), '')) as functions
@@ -322,7 +284,7 @@ order by (proname :: text) COLLATE "C"
 	 ) funcdefs \gset
 
 
-\echo :functions
+
 
 SELECT format('type Domains = ''[%s]',
 	 coalesce(string_agg(format(E'"%s" ::: ''Typedef PG%s',
@@ -334,5 +296,48 @@ JOIN pg_catalog.pg_namespace ON pg_namespace.oid = pg_type.typnamespace
 join pg_catalog.pg_type p2 on pg_type.typbasetype = p2.oid
 WHERE pg_type.typtype = 'd' AND nspname = :'chosen_schema' \gset
 
+
+
+-- PRAGMAS of DOOM
+\echo {-# LANGUAGE DataKinds #-}
+\echo {-# LANGUAGE DeriveGeneric #-}
+\echo {-# LANGUAGE OverloadedLabels #-}
+\echo {-# LANGUAGE FlexibleContexts #-}
+\echo {-# LANGUAGE OverloadedStrings  #-}
+\echo {-# LANGUAGE PolyKinds  #-}
+\echo {-# LANGUAGE TypeApplications #-}
+\echo {-# LANGUAGE TypeOperators #-}
+\echo {-# LANGUAGE GADTs #-}
+\echo {-# OPTIONS_GHC -fno-warn-unticked-promoted-constructors #-}
+\echo
+\echo module :modulename where
+\echo import Squeal.PostgreSQL
+\echo import GHC.TypeLits(Symbol)
+\echo :imports
+
+\echo
+\echo
+\echo :db
+\echo
+--\echo type Schema = Join (Join Tables Enums) Views
+\echo type Schema = Join Tables (Join Views (Join Enums (Join Functions Domains)))
+
+\echo -- enums
+\echo :enums
+\echo -- decls
+\echo :decl
+
+\echo -- schema
+\echo :schem
+\echo
+\echo -- defs
+\echo :defs
+
+\echo -- VIEWS
+\echo :viewtype
+\echo :views
+
+\echo -- functions
+\echo :functions
 \echo :domains
 \echo :decls
