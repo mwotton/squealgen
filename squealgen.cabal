@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7b219f5427642724daeeac38f8fafba3cd8caa01451538929a30de471f6ab29c
+-- hash: 0de994efb1a35c3b66bb6657c13ef33903214a4c7223b689cc8c8d1466ff004d
 
 name:           squealgen
 version:        0.1.0.0
@@ -46,28 +46,18 @@ test-suite tests
   main-is: Spec.hs
   other-modules:
       Arrays.DBSpec
-      Arrays.Schema
       Basic.DBSpec
-      Basic.Schema
       ComplexPrimary.DBSpec
-      ComplexPrimary.Schema
       DBHelpers
       Domains.DBSpec
-      Domains.Schema
       Enums.DBSpec
-      Enums.Schema
       Extensions.DBSpec
-      Extensions.Schema
       Functions.DBSpec
-      Functions.Schema
       InetArrays.DBSpec
-      InetArrays.Schema
       Members.DBSpec
-      Members.Schema
+      MultiSchema.DBSpec
       NoConstraints.DBSpec
-      NoConstraints.Schema
       Views.DBSpec
-      Views.Schema
       Paths_squealgen
   hs-source-dirs:
       test

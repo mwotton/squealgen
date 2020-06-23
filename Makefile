@@ -1,4 +1,4 @@
-testTargets := $(patsubst %.dump.sql,%.hs,$(wildcard test/*/Schema.dump.sql))
+testTargets := $(patsubst %.dump.sql,%.hs,$(wildcard test/*/schemas/*))
 
 squealgen: squealgen.sql mksquealgen.sh
 	./mksquealgen.sh
@@ -8,7 +8,8 @@ install: squealgen
 
 .PHONY: test
 test: squealgen $(testTargets)
-	 stack test --ghc-options="-fprint-potential-instances"
+	echo $(testTargets)
+	stack test --ghc-options="-fprint-potential-instances"
 
 clean:
 	rm $(testTargets)
