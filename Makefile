@@ -1,5 +1,7 @@
-testTargets := $(patsubst %.dump.sql,%.hs,$(wildcard test/*/schemas/*))
+#
+# testTargets := $(patsubst %,%.hs,$(wildcard test/*/schemas/*))
 
+testTargets := $(shell echo $(wildcard test/*/schemas/*) | tr ' ' '\n' | sed 's/\/schemas\/./\U&\E/;s/\/SCHEMAS\//\//g;' | while read x; do echo "$$x.hs"; done)
 squealgen: squealgen.sql mksquealgen.sh
 	./mksquealgen.sh
 
@@ -8,7 +10,7 @@ install: squealgen
 
 .PHONY: test
 test: squealgen $(testTargets)
-	echo $(testTargets)
+	@echo $(testTargets)
 	stack test --ghc-options="-fprint-potential-instances"
 
 clean:
@@ -24,14 +26,16 @@ testwatch: initdb_exists
 	done
 
 # todo: bomb out if `schema` doesn't exist.
-%.hs: %.dump.sql squealgen
+%.hs: schemas/% squealgen
+	@echo $(@D/schemas/%)
 
 	$(eval db := $(shell vendor/pg_tmp))
 	@echo $(db)
-	$(eval schema := $(shell cat $(@D)/schema))
-	$(eval extra_imports := $(shell cat $(@D)/extra_imports))
+	$(eval schema := $(shell cat $$<))
+#	$(eval extra_imports := $(shell cat $(@D)/extra_imports))
 	$(eval tmp := $(shell mktemp /tmp/squealgen.XXXXXX))
 	@echo $(tmp)
 	psql -d $(db) < $< && ./squealgen $(db) "$(patsubst test/%,%,$(*D)).$(*F)" $(schema) $(extra_imports) > $(tmp)
 	./check_schema $(tmp) $@
-        # an unprincipled hack: we tag the db connstr in the directory
+
+# an unprincipled hack: we tag the db connstr in the directory
