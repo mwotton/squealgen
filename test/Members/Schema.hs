@@ -33,7 +33,7 @@ type Tables = ('[
 type EmailsColumns = '["id" ::: 'Def :=> 'NotNull PGint4
   ,"user_id" ::: 'NoDef :=> 'NotNull PGint4
   ,"email" ::: 'NoDef :=> 'Null PGtext]
-type EmailsConstraints = '["fk_user_id" ::: 'ForeignKey '["user_id"] "users" '["id"]
+type EmailsConstraints = '["fk_user_id" ::: 'ForeignKey '["user_id"] "public" "users" '["id"]
   ,"pk_emails" ::: 'PrimaryKey '["id"]]
 type EmailsTable = EmailsConstraints :=> EmailsColumns
 

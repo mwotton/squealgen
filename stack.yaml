@@ -40,7 +40,8 @@ packages:
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
 extra-deps:
-- squeal-postgresql-0.6.0.1
+- git: https://github.com/morphismtech/squeal
+  commit: 1e31a1d341c9f681a71ac7eb0a78fc6c11e619ed
 - free-categories-0.2.0.0@sha256:2d248c669140cf82324569eaf90406c7c9d4a510088aca1979c9bd411bc5980c,855
 - tmp-postgres-1.34.1.0
 - generic-monoid-0.1.0.0@sha256:372875d12742b97befaacbd08a35c2e73cc3821a3b7a09ec1b17a079d0b24ff7,856

@@ -223,7 +223,7 @@ left join (select table_name,
 	     string_agg(format('"%s" ::: %s',constraintDefs.conname,
 	       case contype
 	       when 'p' then format('''PrimaryKey ''["%s"]', array_to_string(cols, '","'))
-	       when 'f' then format('''ForeignKey ''["%s"] "%s" ''["%s"]', array_to_string(cols,'","'), ftab, array_to_string(fcols, '","'))
+	       when 'f' then format('''ForeignKey ''["%s"] "%s" "%s" ''["%s"]', array_to_string(cols,'","'), fnsp, ftab, array_to_string(fcols, '","'))
 	       when 'u' then format('''Unique ''["%s"]', array_to_string(cols,'","'))
 	       else pg_temp.croak (format('bad type %s',contype))
 	       end)
