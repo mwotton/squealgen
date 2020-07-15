@@ -15,10 +15,6 @@ import PostgreSQL.Binary.Decoding(text_strict)
 import Control.Monad.Error.Class
 import GHC.TypeNats
 
-instance KnownNat n => FromPG (VarChar n) where
-  fromPG = devalue $ maybe (throwError "bad varchar encoding")  pure . varChar =<< text_strict
--- end temporary code
-
 getFoo2 :: Statement DB () (Only (VarChar 12))
 getFoo2 = query $ select_ (#foo2 ! #limited `as` #fromOnly) (from (table #foo2))
 

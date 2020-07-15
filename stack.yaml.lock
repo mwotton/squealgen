@@ -5,12 +5,21 @@
 
 packages:
 - completed:
-    hackage: squeal-postgresql-0.6.0.1@sha256:b6e874d4cf215a5b57b8d070d02ac64bb5e5a4b5ab1e7a1d3c4d3321bf6f82cb,5624
+    subdir: squeal-postgresql
+    cabal-file:
+      size: 5886
+      sha256: 709d4c714fdd7a3b3bcf303bc360f19dedc1b1e75415c9031b552f57bd32b1c5
+    name: squeal-postgresql
+    version: 0.6.0.2
+    git: https://github.com/morphismtech/squeal
     pantry-tree:
-      size: 5567
-      sha256: 65dda88a47d3d779f909e80c82e79674496a3610a90400bb97a806ae6300d3d9
+      size: 5931
+      sha256: 7bd6ac0204d51e89ff0f0ae968ab116833b3e0609034c57eadd447d07b8b9ca8
+    commit: 1e31a1d341c9f681a71ac7eb0a78fc6c11e619ed
   original:
-    hackage: squeal-postgresql-0.6.0.1
+    subdir: squeal-postgresql
+    git: https://github.com/morphismtech/squeal
+    commit: 1e31a1d341c9f681a71ac7eb0a78fc6c11e619ed
 - completed:
     hackage: free-categories-0.2.0.0@sha256:2d248c669140cf82324569eaf90406c7c9d4a510088aca1979c9bd411bc5980c,855
     pantry-tree:
@@ -41,7 +50,7 @@ packages:
     hackage: postgres-options-0.2.0.0@sha256:5e2d6408ed3943f9a056b58106186397b9aa1424c56f1f26668305ce8ea2838f,1604
 snapshots:
 - completed:
-    size: 524164
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/14/22.yaml
-    sha256: 7ad8f33179b32d204165a3a662c6269464a47a7e65a30abc38d01b5a38ec42c0
-  original: lts-14.22
+    size: 531707
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/16/5.yaml
+    sha256: 9751e25e0af5713a53ddcfcc79564b082c71b1b357fadef0d85672a5b5ba3703
+  original: lts-16.5
