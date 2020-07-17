@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.31.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d8d59b17fda7cd868752b8d0d00a468ed7ae0bf3b841a350483b32d1a25372d0
+-- hash: 7b038e89d1e736765948e02b8a615b6fc12f560b34b8e237ed6d090e608f9740
 
 name:           squealgen
 version:        0.1.0.0
@@ -56,8 +56,6 @@ test-suite tests
       Domains.Schema
       Enums.DBSpec
       Enums.Schema
-      Extensions.DBSpec
-      Extensions.Schema
       Functions.DBSpec
       Functions.Schema
       InetArrays.DBSpec

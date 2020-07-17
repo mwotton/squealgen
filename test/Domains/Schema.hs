@@ -14,6 +14,9 @@ module Domains.Schema where
 import Squeal.PostgreSQL
 import GHC.TypeLits(Symbol)
 
+type PGltree = UnsafePGType "ltree"
+type PGltxtquery = UnsafePGType "ltxtquery"
+type PGlquery = UnsafePGType "lquery"
 
 
 type DB = '["public" ::: Schema]

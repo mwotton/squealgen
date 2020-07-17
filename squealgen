@@ -104,6 +104,12 @@ select coalesce(string_agg(format('import %s', s.i)  , E'\n'), '') as imports
 from unnest(string_to_array(:'extra_imports', ',')) as s(i) \gset
 \echo :imports
 
+
+-- should really move these out somehow
+\echo type PGltree = UnsafePGType "ltree"
+\echo type PGltxtquery = UnsafePGType "ltxtquery"
+\echo type PGlquery = UnsafePGType "lquery"
+
 \echo
 
 select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
