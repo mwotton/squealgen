@@ -229,6 +229,7 @@ left join (select table_name,
 	       end)
 			, E'\n  ,' order by (constraintDefs.conname ::text) COLLATE "C") as str
 from constraintDefs
+where contype in ('p', 'f', 'u') -- should also handle 'c' for check, but not now.
 group by table_name
 order by (table_name :: text) COLLATE "C" ) cd on cd.table_name = defs.table_name
 group by defs.table_name
