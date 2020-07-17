@@ -94,6 +94,7 @@ from unnest(string_to_array(:'extra_imports', ',')) as s(i) \gset
 
 -- should really move these out somehow
 \echo type PGltree = UnsafePGType "ltree"
+\echo type PGcidr = UnsafePGType "cidr"
 \echo type PGltxtquery = UnsafePGType "ltxtquery"
 \echo type PGlquery = UnsafePGType "lquery"
 

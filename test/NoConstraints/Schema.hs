@@ -15,6 +15,7 @@ import Squeal.PostgreSQL
 import GHC.TypeLits(Symbol)
 
 type PGltree = UnsafePGType "ltree"
+type PGcidr = UnsafePGType "cidr"
 type PGltxtquery = UnsafePGType "ltxtquery"
 type PGlquery = UnsafePGType "lquery"
 
