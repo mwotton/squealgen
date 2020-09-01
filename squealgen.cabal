@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7b038e89d1e736765948e02b8a615b6fc12f560b34b8e237ed6d090e608f9740
+-- hash: b715acee0edce0d8c535a5a13f16e40620d672ababb959064b98dfbadce64800
 
 name:           squealgen
 version:        0.1.0.0
@@ -51,6 +51,8 @@ test-suite tests
       Basic.Schema
       ComplexPrimary.DBSpec
       ComplexPrimary.Schema
+      Composites.DBSpec
+      Composites.Schema
       DBHelpers
       Domains.DBSpec
       Domains.Schema

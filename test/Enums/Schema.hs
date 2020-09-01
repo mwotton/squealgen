@@ -22,13 +22,17 @@ type PGlquery = UnsafePGType "lquery"
 
 type DB = '["public" ::: Schema]
 
-type Schema = Join Tables (Join Views (Join Enums (Join Functions Domains)))
+type Schema = Join Tables (Join Views (Join Enums (Join Functions (Join Composites Domains))))
 -- enums
 type PGtraffic_light = 'PGenum
   '["Red", "Yellow", "Green"]
 -- decls
 type Enums =
   ('["traffic_light" ::: 'Typedef PGtraffic_light] :: [(Symbol,SchemumType)])
+
+type Composites =
+  ('[] :: [(Symbol,SchemumType)])
+
 -- schema
 type Tables = ('[
    "lights" ::: 'Table LightsTable]  :: [(Symbol,SchemumType)])

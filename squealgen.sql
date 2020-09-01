@@ -105,7 +105,7 @@ select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
 \echo :db
 \echo
 --\echo type Schema = Join (Join Tables Enums) Views
-\echo type Schema = Join Tables (Join Views (Join Enums (Join Functions Domains)))
+\echo type Schema = Join Tables (Join Views (Join Enums (Join Functions (Join Composites Domains))))
 
 
 -- now we emit all the enumerations
@@ -129,6 +129,30 @@ from enumerations \gset
 \echo -- decls
 \echo :decl
 
+with composites as (select
+  format(E'type PG%s = ''PGcomposite ''[%s]', t.typname,
+    string_agg(format(E'"%s" ::: ''NotNull ''PG%s', a.attname, t2.typname),', ' order by a.attnum ASC)) as types,
+  format(E'"%1$s" ::: ''Typedef PG%1$s', t.typname) as decl
+from pg_attribute a
+join pg_type t on a.attrelid=t.typrelid
+join pg_type t2 on a.atttypid=t2.oid
+join pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+join pg_class c on t.typrelid=c.oid
+where n.nspname=:'chosen_schema'
+and t.typtype='c'
+and c.relkind='c'
+-- this is a bit of a guess, to be honest.
+-- and t.typarray != 0
+group by t.typname)
+select coalesce(string_agg(composites.types, E'\n'), '') as comps,
+       format(E'type Composites =\n  (''[%s] :: [(Symbol,SchemumType)])',
+	      coalesce(string_agg(composites.decl, E',\n  '), '')) as decl
+from composites \gset
+
+\echo :comps
+\echo :decl
+
+\echo
 
 
 
