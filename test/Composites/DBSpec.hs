@@ -25,17 +25,39 @@ data Clump = Clump
      deriving anyclass (SOP.Generic, SOP.HasDatatypeInfo)
      deriving (IsPG,ToPG db, FromPG) via (Composite Clump)
 
--- to be generated
-type PGclump = 'PGcomposite '["foo" ::: 'NotNull 'PGtext, "bar" ::: 'NotNull 'PGint4]
--- finish generation
+
+data VarClump = VarClump
+  { vfoo :: Text
+  , vbar :: Int32
+  , vbaz :: Text
+  }  deriving stock (Show, GHC.Generic, Eq)
+     deriving anyclass (SOP.Generic, SOP.HasDatatypeInfo)
+     deriving (IsPG,ToPG db, FromPG) via (Composite VarClump)
 
 getClump :: Statement DB (Text,Int32) (Only Clump)
 getClump = query q
   where q :: Query '[] '[] DB '[NotNull PGtext,NotNull PGint4] '["fromOnly" ::: 'NotNull PGclump]
         q = values_ ((astype (typedef #clump) (row (param @1 `as` #foo :* param @2 `as` #bar)))
                      `as` #fromOnly)
+
+-- we have a second one to make sure we emit all of the composites.
+getVarClump :: Statement DB (Text,Int32,Text) (Only VarClump)
+getVarClump = query q
+  where q :: Query '[] '[] DB '[NotNull PGtext,NotNull PGint4,NotNull PGtext]
+                   '["fromOnly" ::: 'NotNull PGvarclump]
+        q = values_ ((astype (typedef #varclump) (row (param @1 `as` #vfoo
+                                                    :* param @2 `as` #vbar
+                                                    :* param @3 `as` #vbaz
+                                                      )))
+                     `as` #fromOnly)
+
+
 spec = describe "Domains" $ do
   it "parses a value" $ do
     runSession "./test/Composites/Schema.dump.sql"
       (getRows =<< executeParams getClump ("hi", 12))
       `shouldReturn` [Only (Clump "hi" 12)]
+
+    runSession "./test/Composites/Schema.dump.sql"
+      (getRows =<< executeParams getVarClump ("hi", 12, "bye"))
+      `shouldReturn` [Only (VarClump "hi" 12 "bye")]
