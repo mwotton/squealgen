@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b715acee0edce0d8c535a5a13f16e40620d672ababb959064b98dfbadce64800
+-- hash: e2cdc71f648d357140a8bcdf8c5c2eb0f2cd1d58a8655c6407f0803ba1bcad2b
 
 name:           squealgen
 version:        0.1.0.0
@@ -51,6 +51,8 @@ test-suite tests
       Basic.Schema
       ComplexPrimary.DBSpec
       ComplexPrimary.Schema
+      CompositeForeignKeys.DBSpec
+      CompositeForeignKeys.Schema
       Composites.DBSpec
       Composites.Schema
       DBHelpers

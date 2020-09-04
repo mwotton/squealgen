@@ -200,40 +200,44 @@ SELECT
   con.contype AS contype,
   nsp.nspname AS nsp,
   tab.relname AS table_name,
-  COALESCE (
-    array_agg (
-      ALL col.attname ORDER BY array_position(con.conkey, col.attnum) ASC
-    ) FILTER (WHERE col.attname IS NOT NULL),
-    ARRAY[] :: text[]
-  ) as cols,
+  col.cols,
   fnsp.nspname AS fnsp,
   ftab.relname AS ftab,
-  array_agg (
-    ALL fcol.attname ORDER BY array_position(con.confkey, fcol.attnum) ASC
-  ) FILTER (WHERE fcol.attname IS NOT NULL) AS fcols
+  fcol.fcols
 FROM pg_catalog.pg_constraint AS con
+join pg_catalog.pg_namespace n on n.oid = con.connamespace
 INNER JOIN pg_catalog.pg_class AS tab
 ON con.conrelid = tab.oid
 INNER JOIN pg_catalog.pg_namespace AS nsp
 ON con.connamespace = nsp.oid
-LEFT OUTER JOIN pg_catalog.pg_attribute AS col
-ON con.conkey @> ARRAY[col.attnum] AND con.conrelid = col.attrelid
+LEFT JOIN LATERAL (select array_agg (all col.attname ORDER BY array_position(con.conkey, col.attnum) ASC) cols
+		   from pg_catalog.pg_attribute col
+     	  	   where con.conkey @> ARRAY[col.attnum]
+		   and con.conrelid = col.attrelid
+		   ) col on true
 LEFT OUTER JOIN pg_catalog.pg_class AS ftab
 ON con.confrelid = ftab.oid
 LEFT OUTER JOIN pg_catalog.pg_namespace AS fnsp
 ON ftab.relnamespace = fnsp.oid
-LEFT OUTER JOIN pg_catalog.pg_attribute AS fcol
-ON con.confkey @> ARRAY[fcol.attnum] AND con.confrelid = fcol.attrelid
+--LEFT OUTER JOIN pg_catalog.pg_attribute AS fcol
+--ON con.confkey @> ARRAY[fcol.attnum] AND con.confrelid = fcol.attrelid
+LEFT JOIN LATERAL (select array_agg (all fcol.attname ORDER BY array_position(con.conkey, fcol.attnum) ASC) fcols
+		   from pg_catalog.pg_attribute fcol
+     	  	   where con.confkey @> ARRAY[fcol.attnum]
+		   and con.conrelid = fcol.attrelid
+		   ) fcol on true
 WHERE con.contype IN ('f', 'c', 'p', 'u')
+AND  n.nspname=:'chosen_schema'
 GROUP BY
   con.conname,
   con.contype,
   nsp.nspname,
   tab.relname,
   fnsp.nspname,
-  ftab.relname
+  ftab.relname,
+  col.cols,
+  fcol.fcols
 );
-
 
 select coalesce(string_agg(allDefs.tabData, E'\n'),'') as defs,
        format(E'type Tables = (''[\n   %s]  :: [(Symbol,SchemumType)])',
