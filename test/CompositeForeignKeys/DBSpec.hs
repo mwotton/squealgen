@@ -5,7 +5,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 module CompositeForeignKeys.DBSpec where
 
-import CompositeForeignKeys.Schema
+import CompositeForeignKeys.Public
 
 import Squeal.PostgreSQL
 import UnliftIO
@@ -21,5 +21,5 @@ import DBHelpers
 
 -- probably should have something better to actually look at the foreign keys, but it appears to be working at least.
 spec = describe "CompositeForeignKeys" $ do
-  it "can run a simple query" $ runSession "./test/CompositeForeignKeys/Schema.dump.sql" $ do
+  it "can run a simple query" $ runSession "CompositeForeignKeys" "Public" $ do
     pure ()

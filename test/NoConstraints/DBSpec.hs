@@ -7,7 +7,7 @@ module NoConstraints.DBSpec where
 import qualified Generics.SOP as SOP
 import qualified GHC.Generics as GHC
 import Test.Hspec
-import NoConstraints.Schema
+import NoConstraints.Public
 import Squeal.PostgreSQL
 
 data Foo = Foo { name :: String }

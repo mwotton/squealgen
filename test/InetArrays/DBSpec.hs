@@ -7,7 +7,7 @@ module InetArrays.DBSpec where
 import qualified Generics.SOP as SOP
 import qualified GHC.Generics as GHC
 import Test.Hspec
-import InetArrays.Schema
+import InetArrays.Public
 import Squeal.PostgreSQL
 import Data.Text
 import Data.Set

@@ -5,7 +5,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 module Members.DBSpec where
 
-import Members.Schema
+import Members.Public
 
 import Squeal.PostgreSQL
 import UnliftIO
@@ -54,7 +54,8 @@ getUsers = query $ select_
 
 
 spec = describe "Members" $ do
-  it "can run a simple query" $ runSession "./test/Members/Schema.dump.sql" $ do
-    executePrepared_ insertUser users
-    fetchedUsers <- getRows =<< execute getUsers
-    fetchedUsers `shouldBe` users
+  it "can run a simple query" $
+    runSession "Members" "Public" $ do
+      executePrepared_ insertUser users
+      fetchedUsers <- getRows =<< execute getUsers
+      fetchedUsers `shouldBe` users

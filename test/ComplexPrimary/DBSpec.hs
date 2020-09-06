@@ -9,7 +9,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 module ComplexPrimary.DBSpec where
 
-import ComplexPrimary.Schema
+import ComplexPrimary.Public
 
 import Squeal.PostgreSQL
 import UnliftIO
@@ -43,7 +43,8 @@ getUsers = query $ select_
 
 
 spec = describe "Members" $ do
-  it "can run a simple query" $ runSession "./test/ComplexPrimary/Schema.dump.sql" $ do
-    executePrepared_ insertUser users
-    fetchedUsers <- getRows =<< execute getUsers
-    fetchedUsers `shouldBe` users
+  it "can run a simple query" $
+    runSession "ComplexPrimary" "Public" $ do
+      executePrepared_ insertUser users
+      fetchedUsers <- getRows =<< execute getUsers
+      fetchedUsers `shouldBe` users
