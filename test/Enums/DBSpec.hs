@@ -8,7 +8,7 @@ module Enums.DBSpec where
 
 import           Data.Int
 import           DBHelpers         (runSession)
-import           Enums.Schema
+import           Enums.Public
 import qualified Generics.SOP      as SOP
 import qualified GHC.Generics      as GHC
 import           Squeal.PostgreSQL
@@ -29,7 +29,7 @@ getLights = query $ select_ (#lights ! #light `as` #fromOnly) (from (table #ligh
 
 spec = describe "Enums" $ do
   it "can fetch enums, and enums from a view" $ do
-    runSession "./test/Enums/Schema.dump.sql"
+    runSession "Enums" "Public"
       ((,) <$> (getRows =<< execute getLights)
            <*> (getRows =<< execute getLightsFromView))
       `shouldReturn` ([Only Red,Only Yellow]

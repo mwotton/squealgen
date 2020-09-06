@@ -11,7 +11,7 @@ module Composites.DBSpec where
 
 import           Data.Int
 import           DBHelpers         (runSession)
-import           Composites.Schema
+import           Composites.Public
 import qualified Generics.SOP      as SOP
 import qualified GHC.Generics      as GHC
 import           Squeal.PostgreSQL
@@ -54,10 +54,10 @@ getVarClump = query q
 
 spec = describe "Domains" $ do
   it "parses a value" $ do
-    runSession "./test/Composites/Schema.dump.sql"
+    runSession "Composites" "Public"
       (getRows =<< executeParams getClump ("hi", 12))
       `shouldReturn` [Only (Clump "hi" 12)]
 
-    runSession "./test/Composites/Schema.dump.sql"
+    runSession "Composites" "Public"
       (getRows =<< executeParams getVarClump ("hi", 12, "bye"))
       `shouldReturn` [Only (VarClump "hi" 12 "bye")]

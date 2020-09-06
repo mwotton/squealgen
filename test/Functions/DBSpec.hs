@@ -6,7 +6,7 @@ module Functions.DBSpec where
 
 import           Data.Int
 import           DBHelpers         (runSession)
-import           Functions.Schema
+import           Functions.Public
 import qualified Generics.SOP      as SOP
 import qualified GHC.Generics      as GHC
 import           Squeal.PostgreSQL
@@ -41,7 +41,7 @@ manyParamsQuery = query $
 
 spec = describe "Functions" $ do
   it "doubles things" $ do
-    runSession "./test/Functions/Schema.dump.sql"
+    runSession "Functions" "Public"
       ((,,)
         <$> (getRows =<< execute multiArgQuery)
         <*> (getRows =<< execute doublerQuery)

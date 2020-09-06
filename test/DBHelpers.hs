@@ -10,11 +10,13 @@ import           Squeal.PostgreSQL      hiding (with)
 import           System.IO
 import           UnliftIO
 
-runSession :: FilePath
+runSession :: String
+           -> String
            -> PQ schema schema IO a
            -> IO a
-runSession sqlfile f = either (error . show)  pure =<< do
-  sql <- BS8.readFile sqlfile
+runSession testname schema f = either (error . show)  pure =<< do
+  let sqlFile = "./test/" <> testname <> "/schemas/" <> schema <> "/structure.sql"
+  sql <- BS8.readFile sqlFile
   withDbCache $ \cache -> do
     withConfig (cacheConfig cache) $ \db -> do
       withConnection (toConnectionString db) $ do

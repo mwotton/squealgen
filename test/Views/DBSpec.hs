@@ -7,7 +7,7 @@ module Views.DBSpec where
 import qualified Generics.SOP as SOP
 import qualified GHC.Generics as GHC
 import Test.Hspec
-import Views.Schema
+import Views.Public
 import Squeal.PostgreSQL
 import Data.Int
 import DBHelpers(runSession)
@@ -28,12 +28,12 @@ getEvilView = query $ select_ #evilnum (from $ view #evil_constant)
 
 
 
-spec = describe "Arrays" $ do
+spec = describe "Views" $ do
   it "compiles" $ do
     'a' `shouldBe` 'a'
 
   it "works" $ do
-    runSession "./test/Views/Schema.dump.sql"
+    runSession "Views" "Public"
       ((,) <$> (getRows =<< execute getEvilView)
            <*> (getRows =<< execute getView))
       `shouldReturn` ([Evil 1337],

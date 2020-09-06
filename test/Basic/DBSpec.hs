@@ -2,7 +2,7 @@
 module Basic.DBSpec where
 
 import Control.Monad
-import           Basic.Schema
+import           Basic.Public
 import           DBHelpers
 import           Squeal.PostgreSQL
 import           Test.Hspec
@@ -20,6 +20,6 @@ getFoo2 = query $ select_ (#foo2 ! #limited `as` #fromOnly) (from (table #foo2))
 
 spec = describe "Basic" $ do
   it "can fetch varchar(12)" $
-    runSession "./test/Basic/Schema.dump.sql"
+    runSession "Basic" "Public"
       (getRows =<< execute getFoo2)
       `shouldReturn` [Only (fromJust $ varChar "hi")]
