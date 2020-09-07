@@ -54,10 +54,10 @@ getVarClump = query q
 
 spec = describe "Domains" $ do
   it "parses a value" $ do
-    runSession "Composites" "Public"
+    runSession "Composites" "Public" []
       (getRows =<< executeParams getClump ("hi", 12))
       `shouldReturn` [Only (Clump "hi" 12)]
 
-    runSession "Composites" "Public"
+    runSession "Composites" "Public" []
       (getRows =<< executeParams getVarClump ("hi", 12, "bye"))
       `shouldReturn` [Only (VarClump "hi" 12 "bye")]

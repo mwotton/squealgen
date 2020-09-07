@@ -21,5 +21,5 @@ import DBHelpers
 
 -- probably should have something better to actually look at the foreign keys, but it appears to be working at least.
 spec = describe "CompositeForeignKeys" $ do
-  it "can run a simple query" $ runSession "CompositeForeignKeys" "Public" $ do
+  it "can run a simple query" $ runSession "CompositeForeignKeys" "Public" [] $ do
     pure ()

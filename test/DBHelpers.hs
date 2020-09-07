@@ -12,13 +12,19 @@ import           UnliftIO
 
 runSession :: String
            -> String
+           -> [String]
            -> PQ schema schema IO a
            -> IO a
-runSession testname schema f = either (error . show)  pure =<< do
-  let sqlFile = "./test/" <> testname <> "/schemas/" <> schema <> "/structure.sql"
-  sql <- BS8.readFile sqlFile
+runSession testname schema extraSchemas f = either (error . show)  pure =<< do
   withDbCache $ \cache -> do
     withConfig (cacheConfig cache) $ \db -> do
       withConnection (toConnectionString db) $ do
-        define (UnsafeDefinition sql)
+        mapM (loader testname) extraSchemas
+        loader testname schema
         f
+  where
+    loader testname sch = do
+      let sqlFile = "./test/" <> testname <> "/schemas/" <> schema <> "/structure.sql"
+      sql <- liftIO $ BS8.readFile sqlFile
+      define (UnsafeDefinition $ BS8.pack $ "set search path to " <> schema <> ",public;")
+      define (UnsafeDefinition sql)

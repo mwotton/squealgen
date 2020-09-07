@@ -44,7 +44,7 @@ getUsers = query $ select_
 
 spec = describe "Members" $ do
   it "can run a simple query" $
-    runSession "ComplexPrimary" "Public" $ do
+    runSession "ComplexPrimary" "Public" [] $ do
       executePrepared_ insertUser users
       fetchedUsers <- getRows =<< execute getUsers
       fetchedUsers `shouldBe` users

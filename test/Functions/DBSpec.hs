@@ -41,7 +41,7 @@ manyParamsQuery = query $
 
 spec = describe "Functions" $ do
   it "doubles things" $ do
-    runSession "Functions" "Public"
+    runSession "Functions" "Public" []
       ((,,)
         <$> (getRows =<< execute multiArgQuery)
         <*> (getRows =<< execute doublerQuery)

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8ad03d0eb4d946c1cc1bb784bb21cbefa056ec84e74cc24bbda79b908bb3aa11
+-- hash: 5cd4c91dc58cf742acf1fcf1d98facd07625115b9b5ef338d77f7d5e800c8eed
 
 name:           squealgen
 version:        0.1.0.0
@@ -66,6 +66,9 @@ test-suite tests
       InetArrays.Public
       Members.DBSpec
       Members.Public
+      MultiSchema.DBSpec
+      MultiSchema.First
+      MultiSchema.Second
       NoConstraints.DBSpec
       NoConstraints.Public
       Views.DBSpec

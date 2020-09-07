@@ -20,6 +20,6 @@ getFoo2 = query $ select_ (#foo2 ! #limited `as` #fromOnly) (from (table #foo2))
 
 spec = describe "Basic" $ do
   it "can fetch varchar(12)" $
-    runSession "Basic" "Public"
+    runSession "Basic" "Public" []
       (getRows =<< execute getFoo2)
       `shouldReturn` [Only (fromJust $ varChar "hi")]
