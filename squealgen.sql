@@ -93,6 +93,8 @@ from unnest(string_to_array(:'extra_imports', ',')) as s(i) \gset
 
 
 -- should really move these out somehow
+\echo type PGname = UnsafePGType "name"
+\echo type PGregclass = UnsafePGType "regclass"
 \echo type PGltree = UnsafePGType "ltree"
 \echo type PGcidr = UnsafePGType "cidr"
 \echo type PGltxtquery = UnsafePGType "ltxtquery"
@@ -131,7 +133,7 @@ from enumerations \gset
 
 with composites as (select
   format(E'type PG%s = ''PGcomposite ''[%s]', t.typname,
-    string_agg(format(E'"%s" ::: ''NotNull PG%s', a.attname, t2.typname),', ' order by a.attnum ASC)) as types,
+    string_agg(format(E'"%s" ::: ''NotNull %s', a.attname, pg_temp.type_decl_from(t2.typtype, t2.typname, false, null)),', ' order by a.attnum ASC)) as types,
   format(E'"%1$s" ::: ''Typedef PG%1$s', t.typname) as decl
 from pg_attribute a
 join pg_type t on a.attrelid=t.typrelid
@@ -310,15 +312,16 @@ select format( E'type Views = \n  ''[%s]\n', coalesce(string_agg(format('"%s" ::
 select format(E'type Functions = \n  ''[ %s ]'
      , coalesce(string_agg(funcdefs.stringform, E'\n   , ' order by (funcdefs.proname :: text) COLLATE "C"), '')) as functions
 from
-  (select format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null PG%s) )'
+  (select format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null %s) )'
 	  , funcs.proname
 	  , string_agg(format('%s %s', (case
 				 when proisstrict then 'NotNull'
 				 else 'Null'
 			     end), pg_temp.type_decl_from(type_arg.typcategory,type_arg.typname,false,null)) -- fixme
 			     , ',  ' order by arg_index)
-	  , ret_type) as stringform
-	  , funcs.proname
+ 	  , pg_temp.type_decl_from(funcs.ret_category, funcs.ret_type,false,null)
+	  ) as stringform
+	  ,funcs.proname
    from
      (select proname,
 	     pronamespace,
@@ -326,7 +329,9 @@ from
 	     typname,
 	     args.arg,
 	     args.arg_index,
-	     type_ret.typname as ret_type
+	     type_ret.typname as ret_type,
+	     type_ret.typcategory as ret_category
+	     
       from (select proname,
 		   pg_temp.FIRST(pronamespace) as pronamespace,
 		   pg_temp.FIRST(proargtypes) as proargtypes,
@@ -351,7 +356,8 @@ from
 	  ) as funcs
 join pg_type type_arg on funcs.arg=type_arg.oid -- internal args are never usable from sql.
 group by proname,
-	 ret_type
+	 ret_type,
+	 ret_category
 having (bool_and(type_arg.typtype <> 'p'))
 order by (proname :: text) COLLATE "C"
 
