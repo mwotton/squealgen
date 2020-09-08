@@ -131,7 +131,7 @@ from enumerations \gset
 
 with composites as (select
   format(E'type PG%s = ''PGcomposite ''[%s]', t.typname,
-    string_agg(format(E'"%s" ::: ''NotNull ''PG%s', a.attname, t2.typname),', ' order by a.attnum ASC)) as types,
+    string_agg(format(E'"%s" ::: ''NotNull PG%s', a.attname, t2.typname),', ' order by a.attnum ASC)) as types,
   format(E'"%1$s" ::: ''Typedef PG%1$s', t.typname) as decl
 from pg_attribute a
 join pg_type t on a.attrelid=t.typrelid
