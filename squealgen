@@ -132,7 +132,11 @@ with enumerations as  (select
 from pg_type t
    join pg_enum e on t.oid = e.enumtypid
    join pg_catalog.pg_namespace n ON n.oid = t.typnamespace
-   where n.nspname=:'chosen_schema'
+-- this is a little bit of a hack. The problem here is that there is nothing to stop a schema using a
+-- datatype from another schema in a table. we _could_ selectively generate only the types we need, but it's
+-- pretty fiddly and may not actually matter that much. Anyway, this comment is here to say I know this is
+-- sketchy and I should probably fix it in a more principled way eventually.
+--   where (n.nspname=:'chosen_schema'
    group by t.typname
    order by (t.typname :: text COLLATE "C"))
  select coalesce(string_agg(enumerations.line, E'\n'),'') as enums,
@@ -227,7 +231,7 @@ INNER JOIN pg_catalog.pg_namespace AS nsp
 ON con.connamespace = nsp.oid
 LEFT JOIN LATERAL (select array_agg (all col.attname ORDER BY array_position(con.conkey, col.attnum) ASC) cols
 		   from pg_catalog.pg_attribute col
-     	  	   where con.conkey @> ARRAY[col.attnum]
+		   where con.conkey @> ARRAY[col.attnum]
 		   and con.conrelid = col.attrelid
 		   ) col on true
 LEFT OUTER JOIN pg_catalog.pg_class AS ftab
@@ -238,7 +242,7 @@ ON ftab.relnamespace = fnsp.oid
 --ON con.confkey @> ARRAY[fcol.attnum] AND con.confrelid = fcol.attrelid
 LEFT JOIN LATERAL (select array_agg (all fcol.attname ORDER BY array_position(con.conkey, fcol.attnum) ASC) fcols
 		   from pg_catalog.pg_attribute fcol
-     	  	   where con.confkey @> ARRAY[fcol.attnum]
+		   where con.confkey @> ARRAY[fcol.attnum]
 		   and con.conrelid = fcol.attrelid
 		   ) fcol on true
 WHERE con.contype IN ('f', 'c', 'p', 'u')
@@ -332,7 +336,7 @@ from
 				 else 'Null'
 			     end), pg_temp.type_decl_from(type_arg.typcategory,type_arg.typname,false,null)) -- fixme
 			     , ',  ' order by arg_index)
- 	  , pg_temp.type_decl_from(funcs.ret_category, funcs.ret_type,false,null)
+	  , pg_temp.type_decl_from(funcs.ret_category, funcs.ret_type,false,null)
 	  ) as stringform
 	  ,funcs.proname
    from
@@ -344,7 +348,7 @@ from
 	     args.arg_index,
 	     type_ret.typname as ret_type,
 	     type_ret.typcategory as ret_category
-	     
+
       from (select proname,
 		   pg_temp.FIRST(pronamespace) as pronamespace,
 		   pg_temp.FIRST(proargtypes) as proargtypes,
