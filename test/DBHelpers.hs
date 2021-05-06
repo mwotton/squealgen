@@ -9,6 +9,7 @@ import           Database.Postgres.Temp
 import           Squeal.PostgreSQL      hiding (with)
 import           System.IO
 import           UnliftIO
+import Data.Char(toLower)
 
 runSession :: String
            -> String
@@ -24,7 +25,6 @@ runSession testname schema extraSchemas f = either (error . show)  pure =<< do
         f
   where
     loader testname sch = do
-      let sqlFile = "./test/" <> testname <> "/schemas/" <> schema <> "/structure.sql"
+      let sqlFile = "./test/" <> testname <> "/schemas/" <> sch <> "/structure.sql"
       sql <- liftIO $ BS8.readFile sqlFile
-      define (UnsafeDefinition $ BS8.pack $ "set search path to " <> schema <> ",public;")
       define (UnsafeDefinition sql)

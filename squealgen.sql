@@ -3,6 +3,7 @@
 
 set search_path to information_schema,:chosen_schema;
 \echo -- | This code was originally created by squealgen. Edit if you know how it got made and are willing to own it now.
+\echo --   chosen schema is :'chosen_schema'
 
 create or replace function pg_temp.croak(message text) returns text as $$
 begin
