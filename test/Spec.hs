@@ -10,6 +10,7 @@ import qualified CompositeForeignKeys.DBSpec
 import qualified Composites.DBSpec
 import qualified Domains.DBSpec
 import qualified Enums.DBSpec
+import qualified CrossSchemaEnums.DBSpec
 import qualified Functions.DBSpec
 import qualified InetArrays.DBSpec
 import qualified Members.DBSpec
@@ -27,6 +28,7 @@ main = do
     , testSpec "Composites.DB" Composites.DBSpec.spec
     , testSpec "Domains.DB" Domains.DBSpec.spec
     , testSpec "Enums.DB" Enums.DBSpec.spec
+    , testSpec "CrossSchemaEnums.DB" CrossSchemaEnums.DBSpec.spec
     , testSpec "Functions.DB" Functions.DBSpec.spec
     , testSpec "InetArrays.DB" InetArrays.DBSpec.spec
     , testSpec "Members.DB" Members.DBSpec.spec
