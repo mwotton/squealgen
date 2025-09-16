@@ -122,24 +122,54 @@ select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
 
 
 -- now we emit all the enumerations
-with enumerations as  (select
+-- Determine only the enums actually used by the chosen schema (including arrays and function args/returns)
+with used_enums as (
+  -- From table/view columns in information_schema
+  select distinct (case when t.typcategory = 'A' then elem.typname else t.typname end) as enumname
+  from information_schema.columns c
+  join pg_catalog.pg_type t on t.typname = c.udt_name
+  left join pg_catalog.pg_type elem on t.typcategory = 'A' and elem.oid = t.typelem
+  join pg_catalog.pg_type base on (case when t.typcategory = 'A' then base.oid = elem.oid else base.oid = t.oid end)
+  where c.table_schema = :'chosen_schema'
+    and base.typcategory = 'E'
+  union
+  -- From function arguments in the chosen schema
+  select distinct (case when targ.typcategory = 'A' then elem2.typname else targ.typname end) as enumname
+  from pg_catalog.pg_proc p
+  join pg_catalog.pg_namespace ns on ns.oid = p.pronamespace
+  join unnest(p.proargtypes) as arg(oid) on true
+  join pg_catalog.pg_type targ on targ.oid = arg.oid
+  left join pg_catalog.pg_type elem2 on targ.typcategory = 'A' and elem2.oid = targ.typelem
+  join pg_catalog.pg_type base2 on (case when targ.typcategory = 'A' then base2.oid = elem2.oid else base2.oid = targ.oid end)
+  where ns.nspname = :'chosen_schema'
+    and base2.typcategory = 'E'
+  union
+  -- From function return types in the chosen schema
+  select distinct (case when tret.typcategory = 'A' then elem3.typname else tret.typname end) as enumname
+  from pg_catalog.pg_proc p
+  join pg_catalog.pg_namespace ns on ns.oid = p.pronamespace
+  join pg_catalog.pg_type tret on tret.oid = p.prorettype
+  left join pg_catalog.pg_type elem3 on tret.typcategory = 'A' and elem3.oid = tret.typelem
+  join pg_catalog.pg_type base3 on (case when tret.typcategory = 'A' then base3.oid = elem3.oid else base3.oid = tret.oid end)
+  where ns.nspname = :'chosen_schema'
+    and base3.typcategory = 'E'
+),
+enumerations as (
+  select
        format(E'type PG%s = ''PGenum\n  ''[%s]',
-			    t.typname,
-			    string_agg(format('"%s"', e.enumlabel), ', ' order by e.enumsortorder)) as line,
+                t.typname,
+                string_agg(format('"%s"', e.enumlabel), ', ' order by e.enumsortorder)) as line,
        format(E'"%1$s" ::: ''Typedef PG%1$s', t.typname) as decl
-from pg_type t
-   join pg_enum e on t.oid = e.enumtypid
-   join pg_catalog.pg_namespace n ON n.oid = t.typnamespace
--- this is a little bit of a hack. The problem here is that there is nothing to stop a schema using a
--- datatype from another schema in a table. we _could_ selectively generate only the types we need, but it's
--- pretty fiddly and may not actually matter that much. Anyway, this comment is here to say I know this is
--- sketchy and I should probably fix it in a more principled way eventually.
---   where (n.nspname=:'chosen_schema'
-   group by t.typname
-   order by (t.typname :: text COLLATE "C"))
- select coalesce(string_agg(enumerations.line, E'\n'),'') as enums,
+  from pg_type t
+     join pg_enum e on t.oid = e.enumtypid
+     join pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+  where t.typname in (select enumname from used_enums)
+  group by t.typname
+  order by (t.typname :: text COLLATE "C")
+)
+select coalesce(string_agg(enumerations.line, E'\n'),'') as enums,
        format(E'type Enums =\n  (''[%s] :: [(Symbol,SchemumType)])',
-	      coalesce(string_agg(enumerations.decl, E',\n  '), '')) as decl
+          coalesce(string_agg(enumerations.decl, E',\n  '), '')) as decl
 from enumerations \gset
 \echo -- enums
 \echo :enums
