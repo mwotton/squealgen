@@ -56,6 +56,10 @@ tests:
     - containers
     - network-ip
     - iproute
+    - filepath
+    - falsify
+    - process
+    - temporary
 
     # temp until merge
     - postgresql-binary
