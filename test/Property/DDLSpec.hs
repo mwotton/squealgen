@@ -16,6 +16,10 @@ import           System.IO.Temp           (withSystemTempDirectory, withSystemTe
 import           System.IO.Unsafe         (unsafePerformIO)
 import           System.Process           (proc, readCreateProcessWithExitCode)
 import           System.Timeout           (timeout)
+import           Debug.Trace              (traceM)
+import           System.Environment       (lookupEnv)
+import           Data.Char                (toLower)
+import           Data.IORef               (IORef, newIORef, atomicModifyIORef')
 import           Test.Falsify.Generator   (Gen)
 import qualified Test.Falsify.Generator   as Gen
 import qualified Test.Falsify.Range       as Range
@@ -28,24 +32,59 @@ compileTimeoutMicros = 60 * 1000 * 1000
 testTree :: TestTree
 testTree = testGroup "Property.DDL"
   [ testProperty "DDL generator produces squeal schemas that compile" ddlProperty
+  , testProperty "Generated module fails when invalid code is appended" ddlInvalidAppendProperty
   ]
 
 ddlProperty :: Property ()
 ddlProperty = do
   schema@(SchemaDDL sql) <- gen ddlSchema
-  info sql
+  traceIf "--- Generated DDL ---"
+  traceIf sql
   case unsafePerformIO (checkSchema schema) of
-    Left err -> testFailed err
+    Left err -> do
+      traceIf "--- DDL Check Failed ---"
+      traceIf err
+      testFailed err
     Right moduleSource -> do
-      info moduleSource
+      traceIf "--- Generated Module Source ---"
+      traceIf moduleSource
       pure ()
+
+-- Append invalid Haskell to a generated module and ensure compilation fails
+ddlInvalidAppendProperty :: Property ()
+ddlInvalidAppendProperty = runOnce $ do
+  let schema = SchemaDDL "CREATE TABLE gen_table_1 (id SERIAL PRIMARY KEY)\n"
+  traceIf "--- Creating simple schema for invalid append test ---"
+  case unsafePerformIO (checkSchema schema) of
+    Left err -> do
+      traceIf ("Setup schema failed: " <> err)
+      testFailed ("setup schema failed: " <> err)
+    Right moduleSource -> do
+      let broken = moduleSource <> "\n\nfoo::Bool\nfoo=\"banana\"\n"
+      traceIf "--- Compiling intentionally broken module ---"
+      case unsafePerformIO (compileModule broken moduleName) of
+        Left _ -> pure ()
+        Right () -> testFailed "expected compilation to fail for invalid appended code"
+
+-- Ensure a property body runs only once across repetitions
+{-# NOINLINE runOnceRef #-}
+runOnceRef :: IORef Bool
+runOnceRef = unsafePerformIO (newIORef False)
+
+runOnce :: Property () -> Property ()
+runOnce body =
+  if unsafePerformIO (atomicModifyIORef' runOnceRef (\ran -> (True, ran)))
+    then pure ()
+    else body
+
+-- Using Debug.Trace.traceM to emit immediate stderr output during property runs
 
 newtype SchemaDDL = SchemaDDL { ddlText :: String }
   deriving stock (Show)
 
 ddlSchema :: Gen SchemaDDL
 ddlSchema = do
-  tableCount <- Gen.int (Range.between (1, 4))
+  tableCount <- Gen.int (Range.between (1, 100))
   tables <- buildTables [] 0 tableCount
   pure $ SchemaDDL { ddlText = renderSchema (reverse tables) }
   where
@@ -91,6 +130,24 @@ renderTable TableDef{ tableName = name, tableRefs = refs } =
 
 moduleName :: String
 moduleName = "GeneratedSchema"
+
+-- Controlled tracing: set SQUEALGEN_TEST_TRACE={1,true,yes,on} to enable
+{-# NOINLINE traceEnabled #-}
+traceEnabled :: Bool
+traceEnabled = unsafePerformIO $ do
+  m <- lookupEnv "SQUEALGEN_TEST_TRACE"
+  let norm = fmap (map toLower) m
+  pure $ case norm of
+    Just "1"    -> True
+    Just "true" -> True
+    Just "yes"  -> True
+    Just "on"   -> True
+    Just "y"    -> True
+    Just "t"    -> True
+    _           -> False
+
+traceIf :: String -> Property ()
+traceIf msg = if traceEnabled then traceM msg else pure ()
 
 checkSchema :: SchemaDDL -> IO (Either String String)
 checkSchema schema = fmap (either (Left . displayException) id) . try @SomeException $ do
