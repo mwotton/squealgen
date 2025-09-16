@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1d82fdd99deaebc8fa655280f3d497e463e85f4c2fc33b63eb8d8468b1090a04
+-- hash: 807081de531cbb7ff932088f601a4c9aea00cfdccd88e98b1a7a99f262e161be
 
 name:           squealgen
 version:        0.1.0.0
@@ -68,6 +68,7 @@ test-suite tests
       Members.Public
       NoConstraints.DBSpec
       NoConstraints.Public
+      Property.DDLSpec
       Views.DBSpec
       Views.Public
       Paths_squealgen
@@ -81,12 +82,12 @@ test-suite tests
       TypeApplications
       TypeOperators
       GADTs
-  build-tool-depends:
-      hspec-discover:hspec-discover
   build-depends:
       base >=4.7
     , bytestring
     , containers
+    , falsify
+    , filepath
     , generics-sop
     , hspec
     , hspec-expectations-lifted
@@ -94,8 +95,12 @@ test-suite tests
     , mtl
     , network-ip
     , postgresql-binary
+    , process
     , squeal-postgresql
     , squealgen
+    , tasty
+    , tasty-hspec
+    , temporary
     , text
     , tmp-postgres >=1.34.1.0
     , unliftio

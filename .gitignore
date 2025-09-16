@@ -4,3 +4,7 @@ TAGS
 .#*
 *#
 *~
+dist-newstyle/
+tmp/
+h
+mp
