@@ -68,6 +68,7 @@ test-suite tests
       Members.Public
       NoConstraints.DBSpec
       NoConstraints.Public
+      PgCatalog.DBSpec
       Property.DDLSpec
       Views.DBSpec
       Views.Public
