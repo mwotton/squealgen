@@ -11,9 +11,9 @@ import InetArrays.Public
 import Squeal.PostgreSQL
 import Data.Text
 import Data.Set
-import Network.IP.Addr (NetAddr, IP)
+import Data.IP (IPRange)
 
-data AddressSets = AddressSets { addresses :: [NetAddr IP] }
+data AddressSets = AddressSets { addresses :: [IPRange] }
   deriving stock (Show, GHC.Generic, Eq)
   deriving anyclass (SOP.Generic, SOP.HasDatatypeInfo)
 

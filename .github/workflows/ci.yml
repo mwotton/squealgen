@@ -1,48 +1,46 @@
 name: CI
 
-# Trigger the workflow on push or pull request, but only for the master branch
 on:
   pull_request:
   push:
     branches: [master]
 
 jobs:
-  stack:
-    name: ${{ matrix.os }}-${{ matrix.ghc }}-stack
-    runs-on:  ${{ matrix.os }}
-    strategy:
-      matrix:
-        stack: ["latest"]
-        ghc: ["8.8.3"]
-        # macOS-latest
-        # mac is failing with a binary error that seems unrelated.
-        os: [ubuntu-latest]
+  cabal:
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-      if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/master'
+      - uses: actions/checkout@v4
 
-    - name: install postgresql on ubuntu
-      if: ${{ matrix.os == 'ubuntu-latest' }}
-      run: |
-        sudo apt install postgresql-10
+      - name: Install PostgreSQL client tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql
 
-    - uses: actions/setup-haskell@v1.1
-      name: Setup Haskell Stack
-      with:
-        ghc-version: ${{ matrix.ghc }}
-        stack-version: ${{ matrix.stack }}
-        enable-stack: true
+      - name: Add PostgreSQL bin to PATH
+        run: echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
 
-    - uses: actions/cache@v1
-      name: Cache ~/.stack
-      with:
-        path: ~/.stack
-        key: ${{ runner.os }}-${{ matrix.ghc }}-stack
+      - name: Setup Haskell
+        id: setup-haskell
+        uses: haskell/actions/setup@v2
+        with:
+          ghc-version: '9.6.6'
+          cabal-version: '3.10.2.0'
 
-    - name: Ensure rebuild
-      run : |
-        touch squealgen.sql
+      - name: Cache cabal store
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cabal/packages
+            ~/.cabal/store
+          key: ${{ runner.os }}-${{ steps.setup-haskell.outputs.ghc-version }}-${{ hashFiles('cabal.project', 'squealgen.cabal') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ steps.setup-haskell.outputs.ghc-version }}-
 
-    - name: Test
-      run: |
-        PATH=/usr/lib/postgresql/10/bin:$PATH make test
+      - name: Update package list
+        run: cabal update
+
+      - name: Build
+        run: cabal build all
+
+      - name: Test
+        run: cabal test --test-show-details=direct
