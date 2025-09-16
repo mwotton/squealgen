@@ -39,7 +39,7 @@ you'll need
 - `initdb` from postgresql to be in your PATH. It typically isn't on Ubuntu systems, at least: usually in /usr/lib/postgresql/$VERSION_NUMBER/bin.
 - pg_tmp from here: https://eradman.com/ephemeralpg/code/ephemeralpg-3.0.tar.gz
 - make
-- stack
+- cabal-install
 
 
 

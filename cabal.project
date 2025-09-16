@@ -1,0 +1,10 @@
+packages: .
+
+with-compiler: ghc-9.6.6
+
+constraints:
+  tmp-postgres >= 1.34.1.0
+
+write-ghc-environment-files: never
+
+tests: True
