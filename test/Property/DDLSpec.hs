@@ -128,8 +128,8 @@ compileModule source modName =
   withSystemTempDirectory "squealgen-ddl" $ \dir -> do
     let hsFile = dir </> modName <> ".hs"
     IO.writeFile hsFile source
-    let args = ["-fno-code", "-fforce-recomp", "-O0", hsFile]
-    withCreateProcess (proc "ghc" args)
+    let args = ["exec", "--", "ghc", "-fno-code", "-fforce-recomp", "-O0", hsFile]
+    withCreateProcess (proc "cabal" args)
       { std_in  = CreatePipe
       , std_out = CreatePipe
       , std_err = CreatePipe
