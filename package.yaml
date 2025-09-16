@@ -58,12 +58,11 @@ tests:
     - iproute
     - filepath
     - falsify
+    - tasty
+    - tasty-hspec
     - process
     - temporary
 
     # temp until merge
     - postgresql-binary
     - mtl
-
-    build-tools:
-    - hspec-discover

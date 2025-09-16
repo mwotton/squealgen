@@ -1,8 +1,9 @@
-module Property.DDLSpec (spec) where
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE TypeApplications #-}
 
-import           Control.Exception        (evaluate)
-import           Control.Monad            (replicateM_)
-import qualified Data.ByteString          as BS
+module Property.DDLSpec (testTree) where
+
+import           Control.Exception        (SomeException, displayException, try)
 import qualified Data.ByteString.Char8    as BS8
 import qualified Data.List                as List
 import qualified Data.List.NonEmpty       as NE
@@ -10,44 +11,37 @@ import           Database.Postgres.Temp
 import           Squeal.PostgreSQL        (Definition (UnsafeDefinition), define, withConnection)
 import           System.Exit              (ExitCode (..))
 import           System.FilePath          ((</>))
-import           System.IO                (Handle, hClose)
 import qualified System.IO                as IO
-import           System.IO.Temp           (withSystemTempDirectory)
-import           System.Process           (CreateProcess (..), StdStream (CreatePipe), proc, terminateProcess,
-                                           waitForProcess, withCreateProcess)
+import           System.IO.Temp           (withSystemTempDirectory, withSystemTempFile)
+import           System.IO.Unsafe         (unsafePerformIO)
+import           System.Process           (proc, readCreateProcessWithExitCode)
 import           System.Timeout           (timeout)
 import           Test.Falsify.Generator   (Gen)
 import qualified Test.Falsify.Generator   as Gen
-import qualified Test.Falsify.Interactive as Falsify
 import qualified Test.Falsify.Range       as Range
-import           Test.Hspec
+import           Test.Tasty               (TestTree, testGroup)
+import           Test.Tasty.Falsify
 
 compileTimeoutMicros :: Int
 compileTimeoutMicros = 60 * 1000 * 1000
 
-iterations :: Int
-iterations = 5
+testTree :: TestTree
+testTree = testGroup "Property.DDL"
+  [ testProperty "DDL generator produces squeal schemas that compile" ddlProperty
+  ]
 
-spec :: Spec
-spec = describe "DDL generator" $ do
-  it "produces squeal schemas that compile" $ do
-    withDbCache $ \cache -> replicateM_ iterations (propertyCase cache)
-
-propertyCase :: Cache -> IO ()
-propertyCase cache = do
-  schema <- Falsify.sample ddlSchema
-  result <- withConfig (cacheConfig cache) $ \db -> do
-    let conn = BS8.unpack (toConnectionString db)
-    withConnection (toConnectionString db) $ do
-      define (UnsafeDefinition (BS8.pack (ddlText schema)))
-    moduleSource <- runSquealgen conn moduleName
-    compileModule moduleSource moduleName
-  either (fail . show) pure result
-
-moduleName :: String
-moduleName = "GeneratedSchema"
+ddlProperty :: Property ()
+ddlProperty = do
+  schema@(SchemaDDL sql) <- gen ddlSchema
+  info sql
+  case unsafePerformIO (checkSchema schema) of
+    Left err -> testFailed err
+    Right moduleSource -> do
+      info moduleSource
+      pure ()
 
 newtype SchemaDDL = SchemaDDL { ddlText :: String }
+  deriving stock (Show)
 
 ddlSchema :: Gen SchemaDDL
 ddlSchema = do
@@ -95,64 +89,59 @@ renderTable TableDef{ tableName = name, tableRefs = refs } =
     renderRef target =
       "    " <> target <> "_id INT REFERENCES " <> target <> "(id)"
 
-runSquealgen :: String -> String -> IO String
-runSquealgen conn moduleName' = do
+moduleName :: String
+moduleName = "GeneratedSchema"
+
+checkSchema :: SchemaDDL -> IO (Either String String)
+checkSchema schema = fmap (either (Left . displayException) id) . try @SomeException $ do
+  withDbCache $ \cache -> do
+    res <- withConfig (cacheConfig cache) $ \db -> do
+      let connBS = toConnectionString db
+      withConnection connBS $ do
+        define (UnsafeDefinition (BS8.pack (ddlText schema)))
+      moduleSourceResult <- runSquealgen (BS8.unpack connBS) moduleName
+      case moduleSourceResult of
+        Left err -> pure (Left err)
+        Right moduleSource -> do
+          compileResult <- compileModule moduleSource moduleName
+          pure $ case compileResult of
+            Left compileErr -> Left compileErr
+            Right ()        -> Right moduleSource
+    pure $ either (Left . show) id res
+
+runSquealgen :: String -> String -> IO (Either String String)
+runSquealgen conn moduleName' = withSystemTempFile "squealgen.sql" $ \path h -> do
   script <- IO.readFile "squealgen.sql"
-  withCreateProcess processSpec $ \mIn mOut mErr ph -> do
-    maybe (pure ()) (\h -> IO.hPutStr h script >> hClose h) mIn
-    out <- maybe (pure mempty) hGetStrict mOut
-    err <- maybe (pure mempty) hGetStrict mErr
-    exit <- waitForProcess ph
-    case exit of
-      ExitSuccess   -> pure (BS8.unpack out)
-      ExitFailure c -> fail $ unlines
-        [ "psql exited with code " <> show c
-        , BS8.unpack err
+  IO.hPutStr h script
+  IO.hClose h
+  let cmd = proc "psql"
+        [ "-X"
+        , "-q"
+        , "-v", "chosen_schema=public"
+        , "-v", "modulename=" <> moduleName'
+        , "-v", "extra_imports="
+        , "-d", conn
+        , "-f", path
         ]
-  where
-    processSpec = (proc "psql"
-      [ "-X"
-      , "-q"
-      , "-v", "chosen_schema=public"
-      , "-v", "modulename=" <> moduleName'
-      , "-v", "extra_imports="
-      , "-d", conn
-      ])
-      { std_in  = CreatePipe
-      , std_out = CreatePipe
-      , std_err = CreatePipe
-      }
+  (exitCode, out, err) <- readCreateProcessWithExitCode cmd ""
+  pure $ case exitCode of
+    ExitSuccess   -> Right out
+    ExitFailure c -> Left $ unlines
+      [ "psql exited with code " <> show c
+      , err
+      ]
 
-compileModule :: String -> String -> IO ()
-compileModule source modName =
-  withSystemTempDirectory "squealgen-ddl" $ \dir -> do
-    let hsFile = dir </> modName <> ".hs"
-    IO.writeFile hsFile source
-    let args = ["exec", "--", "ghc", "-fno-code", "-fforce-recomp", "-O0", hsFile]
-    withCreateProcess (proc "cabal" args)
-      { std_in  = CreatePipe
-      , std_out = CreatePipe
-      , std_err = CreatePipe
-      } $ \mIn mOut mErr ph -> do
-        maybe (pure ()) hClose mIn
-        out <- maybe (pure mempty) hGetStrict mOut
-        err <- maybe (pure mempty) hGetStrict mErr
-        mExit <- timeout compileTimeoutMicros (waitForProcess ph)
-        case mExit of
-          Nothing -> do
-            terminateProcess ph
-            _ <- waitForProcess ph
-            fail "ghc -fno-code timed out"
-          Just ExitSuccess -> pure ()
-          Just (ExitFailure code) ->
-            fail $ unlines
-              [ "ghc -fno-code failed with exit code " <> show code
-              , BS8.unpack out
-              , BS8.unpack err
-              ]
-
-hGetStrict :: Handle -> IO BS.ByteString
-hGetStrict h = do
-  bs <- BS.hGetContents h
-  _ <- evaluate (BS.length bs)
-  pure bs
+compileModule :: String -> String -> IO (Either String ())
+compileModule source modName = withSystemTempDirectory "squealgen-ddl" $ \dir -> do
+  let hsFile = dir </> modName <> ".hs"
+  IO.withFile hsFile IO.WriteMode $ \h -> IO.hPutStr h source
+  let cmd = proc "cabal" ["exec", "--", "ghc", "-fno-code", "-fforce-recomp", "-O0", hsFile]
+  mRes <- timeout compileTimeoutMicros $ readCreateProcessWithExitCode cmd ""
+  pure $ case mRes of
+    Nothing -> Left "cabal exec ghc timed out"
+    Just (ExitSuccess, _, _) -> Right ()
+    Just (ExitFailure code, out, err) -> Left $ unlines
+      [ "cabal exec ghc failed with exit code " <> show code
+      , out
+      , err
+      ]
