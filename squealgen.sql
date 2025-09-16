@@ -186,23 +186,37 @@ from composites \gset
 
 
 create temporary view columnDefs as (SELECT tables.table_name,
-			 format(E'''[%s]',string_agg(mycolumns.colDef, E'\n  ,' order by mycolumns.ordinal_position)
-			 ) as haskCols
+             format(E'''[%s]',string_agg(mycolumns.colDef, E'\n  ,' order by mycolumns.ordinal_position)
+             ) as haskCols
 FROM tables
-join (select columns.*,
-	    format('"%s" ::: %s :=> %s %s',
-	      column_name,
-	      case when column_default is null then '''NoDef'    else '''Def' end,
-	      (case is_nullable
-		 when 'YES' then '''Null'
-		 when  'NO' then '''NotNull'
-		 else pg_temp.croak ('is_nullable broken somehow: ' || is_nullable)
-		 end ),
-		 -- nb: we are assuming the inner array may be nullable. this may not be true, TODO
-		 pg_temp.type_decl_from(data_type, udt_name, domain_name, false, character_maximum_length)
-		 ) as colDef
+join (
+  -- Select normal columns from information_schema
+  select columns.table_schema,
+         columns.table_name,
+         columns.ordinal_position,
+         format('"%s" ::: %s :=> %s %s',
+           column_name,
+           case when column_default is null then '''NoDef' else '''Def' end,
+           (case is_nullable
+              when 'YES' then '''Null'
+              when 'NO'  then '''NotNull'
+              else pg_temp.croak ('is_nullable broken somehow: ' || is_nullable)
+            end),
+           -- nb: we are assuming the inner array may be nullable. this may not be true, TODO
+           pg_temp.type_decl_from(data_type, udt_name, domain_name, false, character_maximum_length)
+         ) as colDef
   from columns
   where columns.table_schema = :'chosen_schema'
+  union all
+  -- Include system OID column for catalogs that expose it (e.g. pg_catalog)
+  select :'chosen_schema'::text as table_schema,
+         c.relname          as table_name,
+         0::information_schema.cardinal_number as ordinal_position,
+         '"oid" ::: ''NoDef :=> ''NotNull PGoid' as colDef
+  from pg_catalog.pg_class c
+  join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = :'chosen_schema'
+    and c.relkind = 'r'
   ) mycolumns on mycolumns.table_name = tables.table_name
 
 WHERE table_type = 'BASE TABLE'
