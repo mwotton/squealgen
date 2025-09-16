@@ -44,9 +44,11 @@ type Tables = ('[
 type Views = 
   '["evil_constant" ::: 'View EvilConstantView,"nullable_constant" ::: 'View NullableConstantView]
 
+-- | An evil constant view.
 type EvilConstantView = 
   '["evilnum" ::: 'NotNull PGint8]
 
+-- | A nullable constant view.
 type NullableConstantView = 
   '["num" ::: 'Null PGint8]
 
@@ -54,4 +56,3 @@ type NullableConstantView =
 type Functions = 
   '[  ]
 type Domains = '[]
-

@@ -43,6 +43,7 @@ type Tables = ('[
 type FooColumns = '["id" ::: 'Def :=> 'NotNull PGint4
   ,"name" ::: 'NoDef :=> 'Null PGtext]
 type FooConstraints = '[]
+-- | Primary foo table.
 type FooTable = FooConstraints :=> FooColumns
 
 type Foo2Columns = '["id" ::: 'Def :=> 'NotNull PGint4
@@ -59,4 +60,3 @@ type Views =
 type Functions = 
   '[  ]
 type Domains = '[]
-
