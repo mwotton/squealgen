@@ -25,7 +25,7 @@ end;
 $$
 LANGUAGE plpgsql;
 
-create or replace function pg_temp.type_decl_from(data_type text, udt_name text, nullable bool, fieldlen cardinal_number) RETURNS text as $$
+create or replace function pg_temp.type_decl_from(data_type text, udt_name text, domain_name text, nullable bool, fieldlen cardinal_number) RETURNS text as $$
   select
   (case
 	-- this is pretty bad - we source the datatypes from the information_schema and also the basic tables (pg_type).
@@ -43,7 +43,7 @@ create or replace function pg_temp.type_decl_from(data_type text, udt_name text,
 	 --                    when udt_name = 'varchar' then 'PGtext'
 	 when udt_name = 'varchar' and fieldlen is null then 'PGtext'
 	 when udt_name = 'varchar' then format('(PGvarchar %s)', fieldlen)
-	 else ('PG' || (udt_name :: text))
+	 else ('PG' || (coalesce(domain_name, udt_name) :: text))
 	 end)
     end);
 $$
@@ -137,7 +137,19 @@ from enumerations \gset
 
 with composites as (select
   format(E'type PG%s = ''PGcomposite ''[%s]', t.typname,
-    string_agg(format(E'"%s" ::: ''NotNull %s', a.attname, pg_temp.type_decl_from(t2.typtype, t2.typname, false, null)),', ' order by a.attnum ASC)) as types,
+    string_agg(
+      format(
+        E'"%s" ::: ''NotNull %s',
+        a.attname,
+        pg_temp.type_decl_from(
+          case when t2.typcategory = 'A' then 'ARRAY' else 'USER-DEFINED' end,
+          t2.typname,
+          NULL,
+          false,
+          case when a.atttypmod > 4 then a.atttypmod - 4 else NULL end
+        )
+      )
+      ,', ' order by a.attnum ASC)) as types,
   format(E'"%1$s" ::: ''Typedef PG%1$s', t.typname) as decl
 from pg_attribute a
 join pg_type t on a.attrelid=t.typrelid
@@ -176,7 +188,7 @@ join (select columns.*,
 		 else pg_temp.croak ('is_nullable broken somehow: ' || is_nullable)
 		 end ),
 		 -- nb: we are assuming the inner array may be nullable. this may not be true, TODO
-		 pg_temp.type_decl_from(data_type, udt_name, false, character_maximum_length)
+		 pg_temp.type_decl_from(data_type, udt_name, domain_name, false, character_maximum_length)
 		 ) as colDef
   from columns
   where columns.table_schema = :'chosen_schema'
@@ -293,7 +305,7 @@ SELECT
       then 'NotNull'
       else 'Null'
     end,
-    pg_temp.type_decl_from(t.typcategory,t.typname,false,null) -- this may be dodgy? need a view that has a varchar(n)
+    pg_temp.type_decl_from(t.typcategory,t.typname,NULL,false,null) -- this may be dodgy? need a view that has a varchar(n)
     ),E'\n   ,') as views,
   c.relname as viewname
 FROM pg_catalog.pg_attribute a join pg_catalog.pg_class c on a.attrelid = c.oid
@@ -321,9 +333,9 @@ from
 	  , string_agg(format('%s %s', (case
 				 when proisstrict then 'NotNull'
 				 else 'Null'
-			     end), pg_temp.type_decl_from(type_arg.typcategory,type_arg.typname,false,null)) -- fixme
+		     end), pg_temp.type_decl_from(type_arg.typcategory,type_arg.typname,NULL,false,null)) -- fixme
 			     , ',  ' order by arg_index)
-	  , pg_temp.type_decl_from(funcs.ret_category, funcs.ret_type,false,null)
+	  , pg_temp.type_decl_from(funcs.ret_category, funcs.ret_type,NULL,false,null)
 	  ) as stringform
 	  ,funcs.proname
    from

@@ -39,7 +39,7 @@ type Tables = ('[
    "pluslove" ::: 'Table PlusloveTable]  :: [(Symbol,SchemumType)])
 
 -- defs
-type PlusloveColumns = '["num" ::: 'NoDef :=> 'NotNull PGint8]
+type PlusloveColumns = '["num" ::: 'NoDef :=> 'NotNull PGpositive]
 type PlusloveConstraints = '[]
 type PlusloveTable = PlusloveConstraints :=> PlusloveColumns
 
