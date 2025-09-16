@@ -58,6 +58,17 @@ $$
 LANGUAGE plpgsql;
 
 
+create or replace function pg_temp.haddock_comment(message text, indent text default '')
+  returns text as $$
+  select case
+           when message is null or btrim(message) = '' then ''
+           else indent || '-- | ' || regexp_replace(message, E'\n', E'\n' || indent || '--   ', 'g') || E'\n'
+         end;
+$$
+language sql
+immutable;
+
+
 -- Create a function that always returns the first non-NULL item
 CREATE OR REPLACE FUNCTION pg_temp.first_agg ( anyelement, anyelement )
 RETURNS anyelement LANGUAGE SQL IMMUTABLE STRICT AS $$
@@ -212,6 +223,16 @@ order by tables.table_name COLLATE "C"
 	 );
 
 
+create temporary view tableComments as (
+  select c.relname as table_name,
+         obj_description(c.oid, 'pg_class') as comment
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = :'chosen_schema'
+    and c.relkind = 'r'
+);
+
+
 create temporary view constraintDefs as (
 SELECT
   con.conname AS conname,
@@ -262,10 +283,11 @@ select coalesce(string_agg(allDefs.tabData, E'\n'),'') as defs,
 	 coalesce(string_agg(format('"%s" ::: ''Table %sTable', allDefs.table_name, allDefs.cappedName), E'\n  ,' order by allDefs.table_name COLLATE "C" ),'')) as schem
 
 from (
-  select format(E'type %1$sColumns = %2$s\ntype %1$sConstraints = ''[%3$s]\ntype %1$sTable = %1$sConstraints :=> %1$sColumns\n',
+  select format(E'type %1$sColumns = %2$s\ntype %1$sConstraints = ''[%3$s]\n%4$stype %1$sTable = %1$sConstraints :=> %1$sColumns\n',
 	       replace(initcap(replace(defs.table_name, '_', ' ')), ' ', ''),
 	       string_agg(defs.cols, 'XXXXX'), -- this shouldn't be necessary
-	       string_agg(cd.str, 'YYYYY')) as tabData,
+	       string_agg(cd.str, 'YYYYY'),
+	       coalesce(pg_temp.haddock_comment((select comment from tableComments where table_name = defs.table_name limit 1)), '')) as tabData,
 	 replace(initcap(replace(defs.table_name, '_', ' ')), ' ', '') as cappedName,
 	 defs.table_name
 from (select table_name, string_agg(columnDefs.haskCols, E'\n  ,') as cols
@@ -307,18 +329,19 @@ SELECT
     end,
     pg_temp.type_decl_from(t.typcategory,t.typname,NULL,false,null) -- this may be dodgy? need a view that has a varchar(n)
     ),E'\n   ,') as views,
-  c.relname as viewname
+  c.relname as viewname,
+  obj_description(c.oid, 'pg_class') as comment
 FROM pg_catalog.pg_attribute a join pg_catalog.pg_class c on a.attrelid = c.oid
  join pg_catalog.pg_namespace n on n.oid = c.relnamespace
  join pg_catalog.pg_type t on a.atttypid=t.oid
  where c.relkind='v' and n.nspname=:'chosen_schema'
  AND a.attnum > 0 AND NOT a.attisdropped
- group by c.relname
+ group by c.relname, obj_description(c.oid, 'pg_class')
  order by (c.relname :: text) COLLATE "C");
 
 -- select coalesce(string_agg(allDefs.tabData, E'\n'),'') as defs,
 select format( E'type Views = \n  ''[%s]\n', coalesce(string_agg(format('"%s" ::: ''View %sView', viewname, pg_temp.initCaps(viewname)), ',')), '') as viewtype,
-       coalesce (string_agg( format( E'type %sView = \n  ''[%s]\n', pg_temp.initCaps(viewname),views), E'\n'), '') as views
+       coalesce (string_agg( format( E'%3$stype %1$sView = \n  ''[%2$s]\n', pg_temp.initCaps(viewname),views, coalesce(pg_temp.haddock_comment(comment), '')), E'\n'), '') as views
        from my_views \gset
 \echo :viewtype
 \echo :views
