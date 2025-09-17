@@ -153,6 +153,20 @@ with used_enums as (
   join pg_catalog.pg_type base3 on (case when tret.typcategory = 'A' then base3.oid = elem3.oid else base3.oid = tret.oid end)
   where ns.nspname = :'chosen_schema'
     and base3.typcategory = 'E'
+  union
+  -- From composite type attributes in the chosen schema
+  select distinct (case when att_t.typcategory = 'A' then elem4.typname else att_t.typname end) as enumname
+  from pg_catalog.pg_type comp
+  join pg_catalog.pg_namespace comp_ns on comp_ns.oid = comp.typnamespace
+  join pg_catalog.pg_class comp_cls on comp.typrelid = comp_cls.oid
+  join pg_catalog.pg_attribute a on a.attrelid = comp.typrelid and a.attnum > 0 and not a.attisdropped
+  join pg_catalog.pg_type att_t on att_t.oid = a.atttypid
+  left join pg_catalog.pg_type elem4 on att_t.typcategory = 'A' and elem4.oid = att_t.typelem
+  join pg_catalog.pg_type base4 on (case when att_t.typcategory = 'A' then base4.oid = elem4.oid else base4.oid = att_t.oid end)
+  where comp_ns.nspname = :'chosen_schema'
+    and comp.typtype = 'c'
+    and comp_cls.relkind = 'c'
+    and base4.typcategory = 'E'
 ),
 enumerations as (
   select
