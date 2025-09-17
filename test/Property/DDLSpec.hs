@@ -171,9 +171,24 @@ checkSchema schema = fmap (either (Left . displayException) id) . try @SomeExcep
 -- Construct a very large schema with N simple tables (no FKs)
 largeSchema :: Int -> SchemaDDL
 largeSchema n =
-  let mk i = "CREATE TABLE gen_table_" <> show i <> " (id SERIAL PRIMARY KEY);"
+  let mk i =
+        let base = ["id SERIAL PRIMARY KEY"]
+            refs = map (\j -> "gen_table_" <> show j <> "_id INT REFERENCES gen_table_" <> show j <> "(id)") (refTargets i)
+            cols = List.intercalate "," (map ("\n    " <>) (base <> refs))
+        in "CREATE TABLE gen_table_" <> show i <> " (" <> cols <> "\n);"
       ddl = List.intercalate "\n" (map mk [1..n]) <> "\n"
   in SchemaDDL ddl
+  where
+    -- Deterministic references to earlier tables to create a realistic graph
+    refTargets :: Int -> [Int]
+    refTargets i
+      | i <= 1    = []
+      | otherwise = uniq $ filter (> 0)
+          ([i-1]
+           <> [i-10 | i > 10 && i `mod` 10 == 0]
+           <> [1     | i `mod` 100 == 0])
+    uniq :: [Int] -> [Int]
+    uniq = List.map head . List.group . List.sort
 
 -- Property: a 500-table schema should compile within 30 seconds
 ddlLargeSchemaCompilesQuickly :: Property ()
