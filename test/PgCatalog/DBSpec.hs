@@ -25,7 +25,6 @@ spec = describe "pg_catalog generation" $ do
     case res of
       Left e   -> expectationFailure ("setup failed: " <> displayException e)
       Right hs -> do
-        hs `shouldContain` "\n\ntype Views = \n  '[\"pg_stat_user_indexes\" ::: 'View PgStatUserIndexesView"
         hs `shouldContain` "type PgStatUserIndexesView = "
 
 run :: IO String

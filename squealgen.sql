@@ -365,30 +365,43 @@ order by defs.table_name COLLATE "C") allDefs \gset
 
 create temporary view my_views as (
 SELECT
-  string_agg(format(E'"%s" ::: ''%s %s',
-    a.attname,
-    case when a.attnotnull
-      then 'NotNull'
-      else 'Null'
-    end,
-    pg_temp.type_decl_from(t.typcategory,t.typname,NULL,false,null) -- this may be dodgy? need a view that has a varchar(n)
-    ),E'\n   ,') as views,
-  c.relname as viewname,
+  string_agg(
+    format(E'"%s" ::: ''%s %s',
+      cols.column_name,
+      case cols.is_nullable
+        when 'YES' then 'Null'
+        when 'NO'  then 'NotNull'
+        else 'Null'
+      end,
+      pg_temp.type_decl_from(cols.data_type, cols.udt_name, cols.domain_name, false, cols.character_maximum_length)
+    )
+    ,E'\n   ,') as views,
+  cols.table_name as viewname,
   obj_description(c.oid, 'pg_class') as comment
-FROM pg_catalog.pg_attribute a join pg_catalog.pg_class c on a.attrelid = c.oid
- join pg_catalog.pg_namespace n on n.oid = c.relnamespace
- join pg_catalog.pg_type t on a.atttypid=t.oid
- where c.relkind='v' and n.nspname=:'chosen_schema'
- AND a.attnum > 0 AND NOT a.attisdropped
- group by c.relname, obj_description(c.oid, 'pg_class')
- order by (c.relname :: text) COLLATE "C");
+FROM information_schema.columns cols
+JOIN pg_catalog.pg_class c ON c.relname = cols.table_name
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE cols.table_schema = :'chosen_schema'
+  AND n.nspname = :'chosen_schema'
+  AND c.relkind IN ('v','m')
+GROUP BY cols.table_name, obj_description(c.oid, 'pg_class')
+ORDER BY (cols.table_name :: text) COLLATE "C");
 
 -- select coalesce(string_agg(allDefs.tabData, E'\n'),'') as defs,
-select format( E'type Views = \n  ''[%s]\n', coalesce(string_agg(format('"%s" ::: ''View %sView', viewname, pg_temp.initCaps(viewname)), ',')), '') as viewtype,
-       coalesce (string_agg( format( E'%3$stype %1$sView = \n  ''[%2$s]\n', pg_temp.initCaps(viewname),views, coalesce(pg_temp.haddock_comment(comment), '')), E'\n'), '') as views
-       from my_views \gset
+-- Emit the Views type list via a variable (short string),
+-- but print each View type definition row-by-row to avoid oversized variables.
+select format( E'type Views = \n  ''[%s]\n', coalesce(string_agg(format('"%s" ::: ''View %sView', viewname, pg_temp.initCaps(viewname)), ','), '')) as viewtype
+  from my_views \gset
 \echo :viewtype
-\echo :views
+\pset tuples_only on
+\pset format unaligned
+select format( E'%3$stype %1$sView = \n  ''[%2$s]\n'
+             , pg_temp.initCaps(viewname)
+             , views
+             , coalesce(pg_temp.haddock_comment(comment), '') )
+  from my_views
+ order by viewname COLLATE "C";
+\pset tuples_only off
 
 \echo -- functions
 
