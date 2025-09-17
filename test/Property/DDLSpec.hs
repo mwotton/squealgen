@@ -33,6 +33,7 @@ testTree :: TestTree
 testTree = testGroup "Property.DDL"
   [ testProperty "DDL generator produces squeal schemas that compile" ddlProperty
   , testProperty "Generated module fails when invalid code is appended" ddlInvalidAppendProperty
+  , testProperty "Large schema (500 tables) compiles within 30s" ddlLargeSchemaCompilesQuickly
   ]
 
 ddlProperty :: Property ()
@@ -166,6 +167,40 @@ checkSchema schema = fmap (either (Left . displayException) id) . try @SomeExcep
             Right ()        -> Right moduleSource
     pure $ either (Left . show) id res
 
+-- Construct a very large schema with N simple tables (no FKs)
+largeSchema :: Int -> SchemaDDL
+largeSchema n =
+  let mk i = "CREATE TABLE gen_table_" <> show i <> " (id SERIAL PRIMARY KEY);"
+      ddl = List.intercalate "\n" (map mk [1..n]) <> "\n"
+  in SchemaDDL ddl
+
+-- Property: a 500-table schema should compile within 30 seconds
+ddlLargeSchemaCompilesQuickly :: Property ()
+ddlLargeSchemaCompilesQuickly = runOnce $ do
+  let tables = 500
+      timeoutSeconds = 30
+      schema = largeSchema tables
+  traceIf ("--- Creating large schema with " <> show tables <> " tables ---")
+  case unsafePerformIO (compileLargeSchemaWithin schema timeoutSeconds) of
+    Left err -> testFailed ("large schema compile failed or timed out: " <> err)
+    Right () -> pure ()
+
+compileLargeSchemaWithin :: SchemaDDL -> Int -> IO (Either String ())
+compileLargeSchemaWithin schema timeoutSeconds = fmap (either (Left . displayException) id) . try @SomeException $ do
+  withDbCache $ \cache -> do
+    res <- withConfig (cacheConfig cache) $ \db -> do
+      let connBS = toConnectionString db
+      withConnection connBS $ do
+        define (UnsafeDefinition (BS8.pack (ddlText schema)))
+      moduleSourceResult <- runSquealgen (BS8.unpack connBS) moduleName
+      case moduleSourceResult of
+        Left err -> pure (Left err)
+        Right moduleSource -> do
+          let micros = timeoutSeconds * 1000 * 1000
+          compileResult <- compileModuleWithTimeout micros moduleSource moduleName
+          pure compileResult
+    pure $ either (Left . show) id res
+
 runSquealgen :: String -> String -> IO (Either String String)
 runSquealgen conn moduleName' = withSystemTempFile "squealgen.sql" $ \path h -> do
   script <- IO.readFile "squealgen.sql"
@@ -189,11 +224,14 @@ runSquealgen conn moduleName' = withSystemTempFile "squealgen.sql" $ \path h -> 
       ]
 
 compileModule :: String -> String -> IO (Either String ())
-compileModule source modName = withSystemTempDirectory "squealgen-ddl" $ \dir -> do
+compileModule source modName = compileModuleWithTimeout compileTimeoutMicros source modName
+
+compileModuleWithTimeout :: Int -> String -> String -> IO (Either String ())
+compileModuleWithTimeout micros source modName = withSystemTempDirectory "squealgen-ddl" $ \dir -> do
   let hsFile = dir </> modName <> ".hs"
   IO.withFile hsFile IO.WriteMode $ \h -> IO.hPutStr h source
   let cmd = proc "cabal" ["exec", "--", "ghc", "-fno-code", "-fforce-recomp", "-O0", hsFile]
-  mRes <- timeout compileTimeoutMicros $ readCreateProcessWithExitCode cmd ""
+  mRes <- timeout micros $ readCreateProcessWithExitCode cmd ""
   pure $ case mRes of
     Nothing -> Left "cabal exec ghc timed out"
     Just (ExitSuccess, _, _) -> Right ()
