@@ -24,6 +24,7 @@ import           Test.Falsify.Generator   (Gen)
 import qualified Test.Falsify.Generator   as Gen
 import qualified Test.Falsify.Range       as Range
 import           Test.Tasty               (TestTree, testGroup)
+import           Control.Monad            (when)
 import           Test.Tasty.Falsify
 
 compileTimeoutMicros :: Int
@@ -191,12 +192,16 @@ compileLargeSchemaWithin schema timeoutSeconds = fmap (either (Left . displayExc
     res <- withConfig (cacheConfig cache) $ \db -> do
       let connBS = toConnectionString db
       withConnection connBS $ do
+        when traceEnabled $ traceM "--- Large schema: Generated DDL ---"
+        when traceEnabled $ traceM (ddlText schema)
         define (UnsafeDefinition (BS8.pack (ddlText schema)))
       moduleSourceResult <- runSquealgen (BS8.unpack connBS) moduleName
       case moduleSourceResult of
         Left err -> pure (Left err)
         Right moduleSource -> do
           let micros = timeoutSeconds * 1000 * 1000
+          when traceEnabled $ traceM "--- Large schema: Generated Module Source ---"
+          when traceEnabled $ traceM moduleSource
           compileResult <- compileModuleWithTimeout micros moduleSource moduleName
           pure compileResult
     pure $ either (Left . show) id res
