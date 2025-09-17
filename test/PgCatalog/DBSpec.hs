@@ -20,6 +20,13 @@ spec = describe "pg_catalog generation" $ do
         hs `shouldContain` "type PgClassColumns"
         hs `shouldContain` "\"oid\" ::: 'NoDef :=> 'NotNull PGoid"
 
+  it "defines View type for pg_stat_user_indexes" $ do
+    res <- try @SomeException run :: IO (Either SomeException String)
+    case res of
+      Left e   -> expectationFailure ("setup failed: " <> displayException e)
+      Right hs -> do
+        hs `shouldContain` "type PgStatUserIndexesView = "
+
 run :: IO String
 run = withDbCache $ \cache -> do
   e <- withConfig (cacheConfig cache) $ \db -> do
