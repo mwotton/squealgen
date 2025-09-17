@@ -60,6 +60,7 @@ test-suite tests
       Domains.Public
       Enums.DBSpec
       CrossSchemaEnums.DBSpec
+      CrossSchemaEnumComposites.DBSpec
       Enums.Public
       Functions.DBSpec
       Functions.Public
