@@ -54,3 +54,12 @@ runSquealgen conn moduleName' = withSystemTempFile "squealgen.sql" $ \path h -> 
   case exitCode of
     ExitSuccess   -> pure out
     ExitFailure c -> ioError (userError (unlines ["psql exited with code " <> show c, err]))
+
+
+  it "generates named view type definitions for pg_catalog views" $ do
+    res <- try @SomeException run :: IO (Either SomeException String)
+    case res of
+      Left e   -> expectationFailure ("setup failed: " <> displayException e)
+      Right hs -> do
+        hs `shouldContain` "\"pg_stat_user_indexes\" ::: 'View PgStatUserIndexesView"
+        hs `shouldContain` "type PgStatUserIndexesView"
