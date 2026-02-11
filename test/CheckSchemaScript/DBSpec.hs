@@ -150,6 +150,12 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
     err `shouldSatisfy` ("below threshold 95%" `isInfixOf`)
     err `shouldSatisfy` ("(9/10)" `isInfixOf`)
 
+  it "coverage gate removes stale tix before running tests" $ do
+    repoRoot <- getCurrentDirectory
+    (exitCode, _, err, _) <- runCoverageScriptWithStaleTixGuard repoRoot
+    exitCode `shouldBe` ExitSuccess
+    err `shouldSatisfy` (not . isInfixOf "stale tix present")
+
   it "drift checker fails on SQL and mode drift, then passes after regeneration" $ do
     repoRoot <- getCurrentDirectory
     withSystemTempDirectory "squealgen-drift-check" $ \tmpDir -> do
@@ -230,6 +236,72 @@ runCoverageScriptWithFakeReport repoRoot fakeReportLine thresholdValue =
     createDirectoryIfMissing True mixPkgDir
     writeFile (srcDir </> "Foo.hs") "module Foo where\nfoo :: Int\nfoo = 1\n"
     writeFile fakeTestBin "#!/usr/bin/env bash\nset -euo pipefail\n: \"${HPCTIXFILE:?missing HPCTIXFILE}\"\ntouch \"$HPCTIXFILE\"\n"
+    makeExecutable fakeTestBin
+    writeFile fakeCabal $ unlines
+      [ "#!/usr/bin/env bash"
+      , "set -euo pipefail"
+      , "if [[ \"$1\" == \"build\" ]]; then exit 0; fi"
+      , "if [[ \"$1\" == \"list-bin\" ]]; then"
+      , "  printf '%s\\n' \"$FAKE_TEST_BIN\""
+      , "  exit 0"
+      , "fi"
+      , "echo \"unexpected cabal args: $*\" >&2"
+      , "exit 1"
+      ]
+    makeExecutable fakeCabal
+    writeFile fakeHpc $ unlines
+      [ "#!/usr/bin/env bash"
+      , "set -euo pipefail"
+      , "if [[ \"$1\" != \"report\" ]]; then"
+      , "  echo \"unexpected hpc args: $*\" >&2"
+      , "  exit 1"
+      , "fi"
+      , "printf '%s\\n' \"$FAKE_HPC_REPORT_LINE\""
+      ]
+    makeExecutable fakeHpc
+
+    env <- ((envVars ++) . overridePath fakeBin) <$> getEnvironment
+    let cmd = (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_coverage.sh"]) { env = Just env }
+    (exitCode, out, err) <- readCreateProcessWithExitCode cmd ""
+    hasSummary <- doesFileExist summaryPath
+    summary <- if hasSummary then readFile summaryPath else pure ""
+    pure (exitCode, out, err, summary)
+
+runCoverageScriptWithStaleTixGuard :: FilePath -> IO (ExitCode, String, String, String)
+runCoverageScriptWithStaleTixGuard repoRoot =
+  withSystemTempDirectory "coverage-stale-tix" $ \tmpDir -> do
+    let coverageScript = tmpDir </> "check_coverage.sh"
+        fakeBin = tmpDir </> "bin"
+        fakeCabal = fakeBin </> "cabal"
+        fakeHpc = fakeBin </> "hpc"
+        fakeTestBin = tmpDir </> "fake-tests-bin"
+        srcDir = tmpDir </> "src"
+        reportDir = tmpDir </> "coverage"
+        staleTix = reportDir </> "tests.tix"
+        mixPkgDir = tmpDir </> "dist-newstyle" </> "build" </> "x" </> "hpc" </> "mix" </> "pkg"
+        envVars =
+          [ ("FAKE_TEST_BIN", fakeTestBin)
+          , ("FAKE_HPC_REPORT_LINE", "100% expressions used (1/1)")
+          ]
+        summaryPath = reportDir </> "summary.txt"
+    copyFile (repoRoot </> "check_coverage.sh") coverageScript
+    makeExecutable coverageScript
+    createDirectoryIfMissing True fakeBin
+    createDirectoryIfMissing True srcDir
+    createDirectoryIfMissing True mixPkgDir
+    createDirectoryIfMissing True reportDir
+    writeFile (srcDir </> "Foo.hs") "module Foo where\nfoo :: Int\nfoo = 1\n"
+    writeFile staleTix "stale\n"
+    writeFile fakeTestBin $ unlines
+      [ "#!/usr/bin/env bash"
+      , "set -euo pipefail"
+      , ": \"${HPCTIXFILE:?missing HPCTIXFILE}\""
+      , "if [[ -e \"$HPCTIXFILE\" ]]; then"
+      , "  echo \"stale tix present before test execution\" >&2"
+      , "  exit 1"
+      , "fi"
+      , "touch \"$HPCTIXFILE\""
+      ]
     makeExecutable fakeTestBin
     writeFile fakeCabal $ unlines
       [ "#!/usr/bin/env bash"
