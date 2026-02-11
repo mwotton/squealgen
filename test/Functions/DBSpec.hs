@@ -64,8 +64,12 @@ spec = describe "Functions" $ do
         hs `shouldContain` "\"overloaded__int4\" ::: Function ('[ Null PGint4 ] :=> 'Returns ( 'Null PGint4) )"
         hs `shouldContain` "\"overloaded__int8\" ::: Function ('[ Null PGint8 ] :=> 'Returns ( 'Null PGint8) )"
         hs `shouldContain` "\"zero_arg\" ::: Function ('[  ] :=> 'Returns ( 'Null PGint8) )"
+        hs `shouldContain` "\"out_only\" ::: Function ('[  ] :=> 'Returns ( 'Null PGint8) )"
+        hs `shouldContain` "\"inout_only\" ::: Function ('[ Null PGint8 ] :=> 'Returns ( 'Null PGint8) )"
+        hs `shouldContain` "\"mixed_in_inout\" ::: Function ('[ Null PGint8,  Null PGint8 ] :=> 'Returns ( 'Null PGint8) )"
+        hs `shouldContain` "\"proc_increment\" ::: 'Procedure '[ Null PGint8 ]"
         hs `shouldContain` "-- Omitted function signatures:"
-        hs `shouldContain` "--   inout_params(int8): OUT/INOUT/TABLE parameters are not yet representable"
+        hs `shouldContain` "--   inout_params(int8): pseudotype return is not representable"
 
 runGenerator :: IO String
 runGenerator = withDbCache $ \cache -> do
