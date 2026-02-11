@@ -19,7 +19,7 @@ import           System.Timeout           (timeout)
 import           Debug.Trace              (traceM)
 import           System.Environment       (lookupEnv)
 import           Data.Char                (toLower)
-import           Data.IORef               (IORef, atomicModifyIORef', newIORef, readIORef, writeIORef)
+import           Data.IORef               (IORef, newIORef, readIORef, writeIORef)
 import           Test.Falsify.Generator   (Gen)
 import qualified Test.Falsify.Generator   as Gen
 import qualified Test.Falsify.Range       as Range
@@ -56,7 +56,7 @@ ddlProperty = do
 
 -- Append invalid Haskell to a generated module and ensure compilation fails
 ddlInvalidAppendProperty :: Property ()
-ddlInvalidAppendProperty = runOnce $ do
+ddlInvalidAppendProperty = do
   case unsafePerformIO (writeIORef ddlInvalidAppendExecutedRef True) of
     () -> pure ()
   let schema = SchemaDDL "CREATE TABLE gen_table_1 (id SERIAL PRIMARY KEY)\n"
@@ -71,17 +71,6 @@ ddlInvalidAppendProperty = runOnce $ do
       case unsafePerformIO (compileModule broken moduleName) of
         Left _ -> pure ()
         Right () -> testFailed "expected compilation to fail for invalid appended code"
-
--- Ensure a property body runs only once across repetitions
-{-# NOINLINE runOnceRef #-}
-runOnceRef :: IORef Bool
-runOnceRef = unsafePerformIO (newIORef False)
-
-runOnce :: Property () -> Property ()
-runOnce body =
-  if unsafePerformIO (atomicModifyIORef' runOnceRef (\ran -> (True, ran)))
-    then pure ()
-    else body
 
 {-# NOINLINE ddlInvalidAppendExecutedRef #-}
 ddlInvalidAppendExecutedRef :: IORef Bool
@@ -204,7 +193,7 @@ largeSchema n =
 
 -- Property: a 500-table schema should compile within 30 seconds
 ddlLargeSchemaCompilesQuickly :: Property ()
-ddlLargeSchemaCompilesQuickly = runOnce $ do
+ddlLargeSchemaCompilesQuickly = do
   case unsafePerformIO (writeIORef ddlLargeSchemaExecutedRef True) of
     () -> pure ()
   let tables = 500
