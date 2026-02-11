@@ -72,8 +72,17 @@ report_output="$(hpc report "$latest_tix" --hpcdir "$combined_hpcdir" "${include
 printf '%s\n' "$report_output" | tee "$report_dir/hpc-report.txt"
 
 coverage_percent="$(printf '%s\n' "$report_output" | sed -n -E 's/^[[:space:]]*([0-9]+(\.[0-9]+)?)% expressions used.*/\1/p' | head -n 1)"
-if [[ -z "$coverage_percent" ]]; then
-  echo "ERROR: unable to parse expression coverage percentage" >&2
+coverage_line="$(printf '%s\n' "$report_output" | sed -n -E 's/^[[:space:]]*([0-9]+(\.[0-9]+)?)% expressions used[[:space:]]*\(([0-9]+)\/([0-9]+)\).*/\1 \3 \4/p' | head -n 1)"
+if [[ -z "$coverage_line" ]]; then
+  echo "ERROR: unable to parse expression coverage percentage and counts (used/total)" >&2
+  exit 1
+fi
+read -r coverage_percent expressions_used expressions_total <<< "$coverage_line"
+
+echo "Parsed expression coverage: ${coverage_percent}% (${expressions_used}/${expressions_total})"
+
+if [[ "$expressions_total" -eq 0 ]]; then
+  echo "ERROR: expression coverage denominator is zero (${expressions_used}/${expressions_total}); refusing false-green coverage result" >&2
   exit 1
 fi
 
@@ -82,13 +91,15 @@ fi
   echo "excluded_generated_modules=true"
   echo "threshold_percent=$threshold"
   echo "expressions_percent=$coverage_percent"
+  echo "expressions_used=$expressions_used"
+  echo "expressions_total=$expressions_total"
   echo "tix=$latest_tix"
   echo "included_modules=${included_modules[*]}"
 } > "$report_dir/summary.txt"
 
 if ! awk -v c="$coverage_percent" -v t="$threshold" 'BEGIN { exit ((c + 0) >= (t + 0) ? 0 : 1) }'; then
-  echo "ERROR: expression coverage ${coverage_percent}% is below threshold ${threshold}%" >&2
+  echo "ERROR: expression coverage ${coverage_percent}% (${expressions_used}/${expressions_total}) is below threshold ${threshold}%" >&2
   exit 1
 fi
 
-echo "Coverage gate passed: ${coverage_percent}% >= ${threshold}%"
+echo "Coverage gate passed: ${coverage_percent}% (${expressions_used}/${expressions_total}) >= ${threshold}%"

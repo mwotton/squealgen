@@ -1,7 +1,7 @@
 module CheckSchemaScript.DBSpec (spec) where
 
 import           Data.List          (isInfixOf)
-import           System.Directory   (Permissions (..), copyFile, createDirectoryIfMissing, getCurrentDirectory, getPermissions, setPermissions)
+import           System.Directory   (Permissions (..), copyFile, createDirectoryIfMissing, doesFileExist, getCurrentDirectory, getPermissions, setPermissions)
 import           System.Environment (getEnvironment)
 import           System.Exit        (ExitCode (..))
 import           System.FilePath    ((</>))
@@ -129,51 +129,26 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
 
   it "coverage gate fails when expression denominator is zero" $ do
     repoRoot <- getCurrentDirectory
-    withSystemTempDirectory "coverage-zero-denominator" $ \tmpDir -> do
-      let coverageScript = tmpDir </> "check_coverage.sh"
-          fakeBin = tmpDir </> "bin"
-          fakeCabal = fakeBin </> "cabal"
-          fakeHpc = fakeBin </> "hpc"
-          fakeTestBin = tmpDir </> "fake-tests-bin"
-          srcDir = tmpDir </> "src"
-          mixPkgDir = tmpDir </> "dist-newstyle" </> "build" </> "x" </> "hpc" </> "mix" </> "pkg"
-          envVars = [("FAKE_TEST_BIN", fakeTestBin), ("FAKE_HPC_REPORT_LINE", "100% expressions used (0/0)")]
-      copyFile (repoRoot </> "check_coverage.sh") coverageScript
-      makeExecutable coverageScript
-      createDirectoryIfMissing True fakeBin
-      createDirectoryIfMissing True srcDir
-      createDirectoryIfMissing True mixPkgDir
-      writeFile (srcDir </> "Foo.hs") "module Foo where\nfoo :: Int\nfoo = 1\n"
-      writeFile fakeTestBin "#!/usr/bin/env bash\nset -euo pipefail\n: \"${HPCTIXFILE:?missing HPCTIXFILE}\"\ntouch \"$HPCTIXFILE\"\n"
-      makeExecutable fakeTestBin
-      writeFile fakeCabal $ unlines
-        [ "#!/usr/bin/env bash"
-        , "set -euo pipefail"
-        , "if [[ \"$1\" == \"build\" ]]; then exit 0; fi"
-        , "if [[ \"$1\" == \"list-bin\" ]]; then"
-        , "  printf '%s\\n' \"$FAKE_TEST_BIN\""
-        , "  exit 0"
-        , "fi"
-        , "echo \"unexpected cabal args: $*\" >&2"
-        , "exit 1"
-        ]
-      makeExecutable fakeCabal
-      writeFile fakeHpc $ unlines
-        [ "#!/usr/bin/env bash"
-        , "set -euo pipefail"
-        , "if [[ \"$1\" != \"report\" ]]; then"
-        , "  echo \"unexpected hpc args: $*\" >&2"
-        , "  exit 1"
-        , "fi"
-        , "printf '%s\\n' \"$FAKE_HPC_REPORT_LINE\""
-        ]
-      makeExecutable fakeHpc
+    (exitCode, _, err, _) <- runCoverageScriptWithFakeReport repoRoot "100% expressions used (0/0)" "100"
+    exitCode `shouldBe` ExitFailure 1
+    err `shouldSatisfy` ("denominator is zero" `isInfixOf`)
+    err `shouldSatisfy` ("(0/0)" `isInfixOf`)
 
-      env <- ((envVars ++) . overridePath fakeBin) <$> getEnvironment
-      let cmd = (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_coverage.sh"]) { env = Just env }
-      (exitCode, _, err) <- readCreateProcessWithExitCode cmd ""
-      exitCode `shouldBe` ExitFailure 1
-      err `shouldSatisfy` ("denominator is zero" `isInfixOf`)
+  it "coverage gate passes when denominator is non-zero and threshold is met" $ do
+    repoRoot <- getCurrentDirectory
+    (exitCode, out, _, summary) <- runCoverageScriptWithFakeReport repoRoot "90% expressions used (9/10)" "80"
+    exitCode `shouldBe` ExitSuccess
+    out `shouldSatisfy` ("Parsed expression coverage: 90% (9/10)" `isInfixOf`)
+    out `shouldSatisfy` ("Coverage gate passed: 90% (9/10) >= 80%" `isInfixOf`)
+    summary `shouldSatisfy` ("expressions_used=9" `isInfixOf`)
+    summary `shouldSatisfy` ("expressions_total=10" `isInfixOf`)
+
+  it "coverage gate fails when denominator is non-zero but threshold is not met" $ do
+    repoRoot <- getCurrentDirectory
+    (exitCode, _, err, _) <- runCoverageScriptWithFakeReport repoRoot "90% expressions used (9/10)" "95"
+    exitCode `shouldBe` ExitFailure 1
+    err `shouldSatisfy` ("below threshold 95%" `isInfixOf`)
+    err `shouldSatisfy` ("(9/10)" `isInfixOf`)
 
   it "drift checker fails on SQL and mode drift, then passes after regeneration" $ do
     repoRoot <- getCurrentDirectory
@@ -231,6 +206,60 @@ overridePath :: FilePath -> [(String, String)] -> [(String, String)]
 overridePath fakeBin env = ("PATH", fakeBin <> ":" <> currentPath) : filter ((/= "PATH") . fst) env
   where
     currentPath = maybe "" id (lookup "PATH" env)
+
+runCoverageScriptWithFakeReport :: FilePath -> String -> String -> IO (ExitCode, String, String, String)
+runCoverageScriptWithFakeReport repoRoot fakeReportLine thresholdValue =
+  withSystemTempDirectory "coverage-gate" $ \tmpDir -> do
+    let coverageScript = tmpDir </> "check_coverage.sh"
+        fakeBin = tmpDir </> "bin"
+        fakeCabal = fakeBin </> "cabal"
+        fakeHpc = fakeBin </> "hpc"
+        fakeTestBin = tmpDir </> "fake-tests-bin"
+        srcDir = tmpDir </> "src"
+        mixPkgDir = tmpDir </> "dist-newstyle" </> "build" </> "x" </> "hpc" </> "mix" </> "pkg"
+        envVars =
+          [ ("FAKE_TEST_BIN", fakeTestBin)
+          , ("FAKE_HPC_REPORT_LINE", fakeReportLine)
+          , ("COVERAGE_THRESHOLD", thresholdValue)
+          ]
+        summaryPath = tmpDir </> "coverage" </> "summary.txt"
+    copyFile (repoRoot </> "check_coverage.sh") coverageScript
+    makeExecutable coverageScript
+    createDirectoryIfMissing True fakeBin
+    createDirectoryIfMissing True srcDir
+    createDirectoryIfMissing True mixPkgDir
+    writeFile (srcDir </> "Foo.hs") "module Foo where\nfoo :: Int\nfoo = 1\n"
+    writeFile fakeTestBin "#!/usr/bin/env bash\nset -euo pipefail\n: \"${HPCTIXFILE:?missing HPCTIXFILE}\"\ntouch \"$HPCTIXFILE\"\n"
+    makeExecutable fakeTestBin
+    writeFile fakeCabal $ unlines
+      [ "#!/usr/bin/env bash"
+      , "set -euo pipefail"
+      , "if [[ \"$1\" == \"build\" ]]; then exit 0; fi"
+      , "if [[ \"$1\" == \"list-bin\" ]]; then"
+      , "  printf '%s\\n' \"$FAKE_TEST_BIN\""
+      , "  exit 0"
+      , "fi"
+      , "echo \"unexpected cabal args: $*\" >&2"
+      , "exit 1"
+      ]
+    makeExecutable fakeCabal
+    writeFile fakeHpc $ unlines
+      [ "#!/usr/bin/env bash"
+      , "set -euo pipefail"
+      , "if [[ \"$1\" != \"report\" ]]; then"
+      , "  echo \"unexpected hpc args: $*\" >&2"
+      , "  exit 1"
+      , "fi"
+      , "printf '%s\\n' \"$FAKE_HPC_REPORT_LINE\""
+      ]
+    makeExecutable fakeHpc
+
+    env <- ((envVars ++) . overridePath fakeBin) <$> getEnvironment
+    let cmd = (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_coverage.sh"]) { env = Just env }
+    (exitCode, out, err) <- readCreateProcessWithExitCode cmd ""
+    hasSummary <- doesFileExist summaryPath
+    summary <- if hasSummary then readFile summaryPath else pure ""
+    pure (exitCode, out, err, summary)
 
 runInRepo :: FilePath -> String -> IO ()
 runInRepo dir command = do
