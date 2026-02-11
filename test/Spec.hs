@@ -20,6 +20,7 @@ import qualified Members.DBSpec
 import qualified NoConstraints.DBSpec
 import qualified ForeignKeyReferencedColumns.DBSpec
 import qualified Property.DDLSpec
+import qualified Property.DDLHarnessSpec
 import qualified Views.DBSpec
 import qualified PgCatalog.DBSpec
 import qualified Triggers.DBSpec
@@ -43,6 +44,7 @@ main = do
     , testSpec "Members.DB" Members.DBSpec.spec
     , testSpec "NoConstraints.DB" NoConstraints.DBSpec.spec
     , testSpec "ForeignKeyReferencedColumns.DB" ForeignKeyReferencedColumns.DBSpec.spec
+    , testSpec "Property.DDLHarness" Property.DDLHarnessSpec.spec
     , testSpec "Views.DB" Views.DBSpec.spec
     , testSpec "PgCatalog.DB" PgCatalog.DBSpec.spec
     , testSpec "Triggers.DB" Triggers.DBSpec.spec
