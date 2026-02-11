@@ -419,62 +419,102 @@ select format( E'%3$stype %1$sView = \n  ''[%2$s]\n'
 
 \echo -- functions
 
+create temporary view my_functions as
+with function_meta as (
+  select p.oid,
+         p.proname,
+         p.proisstrict,
+         p.prokind,
+         p.proargtypes,
+         p.proargmodes,
+         ret.typname as ret_type,
+         ret.typcategory as ret_category,
+         ret.typtype as ret_typtype
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace ns
+      on ns.oid = p.pronamespace
+    join pg_catalog.pg_type ret
+      on ret.oid = p.prorettype
+   where ns.nspname = :'chosen_schema'
+), function_args as (
+  select fm.oid,
+         string_agg(
+           format('%s %s',
+                  case when fm.proisstrict then 'NotNull' else 'Null' end,
+                  pg_temp.type_decl_from(type_arg.typcategory, type_arg.typname, null, false, null)),
+           ',  ' order by args.arg_index
+         ) filter (where args.arg_oid is not null) as arg_decls,
+         string_agg(
+           regexp_replace(lower(type_arg.typname), '[^a-z0-9]+', '_', 'g'),
+           '__' order by args.arg_index
+         ) filter (where args.arg_oid is not null) as arg_tokens,
+         bool_and(type_arg.typtype <> 'p') filter (where args.arg_oid is not null) as args_representable
+    from function_meta fm
+    left join lateral unnest(fm.proargtypes) with ordinality as args(arg_oid, arg_index)
+      on true
+    left join pg_catalog.pg_type type_arg
+      on type_arg.oid = args.arg_oid
+   group by fm.oid
+), function_classified as (
+  select fm.oid,
+         fm.proname,
+         fm.ret_type,
+         fm.ret_category,
+         count(*) over (partition by fm.proname) as overload_count,
+         coalesce(fa.arg_decls, '') as arg_decls,
+         coalesce(fa.arg_tokens, '') as arg_tokens,
+         case
+           when fm.prokind = 'p' then 'procedures are not yet representable'
+           when coalesce(array_to_string(fm.proargmodes, ''), '') ~ '[obt]'
+             then 'OUT/INOUT/TABLE parameters are not yet representable'
+           when fm.ret_typtype = 'p' then 'pseudotype return is not representable'
+           when not coalesce(fa.args_representable, true) then 'pseudotype argument is not representable'
+           else null
+         end as omission_reason
+    from function_meta fm
+    left join function_args fa
+      on fa.oid = fm.oid
+)
+select proname,
+       arg_decls,
+       arg_tokens,
+       ret_type,
+       ret_category,
+       omission_reason,
+       case
+         when overload_count > 1
+           then proname || '__' || coalesce(nullif(arg_tokens, ''), 'noargs')
+         else proname
+       end as label
+  from function_classified;
+
 select format(E'type Functions = \n  ''[ %s ]'
-     , coalesce(string_agg(funcdefs.stringform, E'\n   , ' order by (funcdefs.proname :: text) COLLATE "C"), '')) as functions
-from
-  (select format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null %s) )'
-	  , funcs.proname
-	  , string_agg(format('%s %s', (case
-				 when proisstrict then 'NotNull'
-				 else 'Null'
-		     end), pg_temp.type_decl_from(type_arg.typcategory,type_arg.typname,NULL,false,null)) -- fixme
-			     , ',  ' order by arg_index)
-	  , pg_temp.type_decl_from(funcs.ret_category, funcs.ret_type,NULL,false,null)
-	  ) as stringform
-	  ,funcs.proname
-   from
-     (select proname,
-	     pronamespace,
-	     proisstrict,
-	     typname,
-	     args.arg,
-	     args.arg_index,
-	     type_ret.typname as ret_type,
-	     type_ret.typcategory as ret_category
-
-      from (select proname,
-		   pg_temp.FIRST(pronamespace) as pronamespace,
-		   pg_temp.FIRST(proargtypes) as proargtypes,
-		   pg_temp.FIRST(proisstrict) as proisstrict,
-		   pg_temp.FIRST(prorettype) as prorettype
-	    from pg_proc
-	    group by proname
-	    having count(proname)=1 ) p
-	   -- need ordinality to keep function argument ordering correct
-	  ,unnest(p.proargtypes) with  ordinality as args(arg,arg_index)
-	  ,pg_namespace ns
-	  ,pg_type type_ret
-	  WHERE p.pronamespace = ns.oid
-	  AND p.prorettype=type_ret.oid
-	  AND ns.nspname = :'chosen_schema'
-	  -- TODO we can't currently model functions with in and out parameters,
-	  -- so we'll just avoid generating anything for them.
-	  -- we will still want to ignore all other pseudotypes
-	  -- but records will be ok eventually.
-	  AND type_ret.typtype <> 'p'
-
-	  ) as funcs
-join pg_type type_arg on funcs.arg=type_arg.oid -- internal args are never usable from sql.
-group by proname,
-	 ret_type,
-	 ret_category
-having (bool_and(type_arg.typtype <> 'p'))
-order by (proname :: text) COLLATE "C"
-
-	 ) funcdefs \gset
-
-
+     , coalesce(string_agg(
+         format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null %s) )',
+           funcs.label,
+           funcs.arg_decls,
+           pg_temp.type_decl_from(funcs.ret_category, funcs.ret_type, null, false, null)
+         ),
+         E'\n   , ' order by (funcs.label :: text) COLLATE "C"), '')
+       ) as functions
+from my_functions funcs
+where funcs.omission_reason is null \gset
 \echo :functions
+
+select case
+         when count(*) = 0 then '-- Omitted function signatures: none'
+         else E'-- Omitted function signatures:\n'
+              || string_agg(
+                   format(E'--   %s(%s): %s',
+                     funcs.proname,
+                     coalesce(nullif(replace(funcs.arg_tokens, '__', ', '), ''), 'noargs'),
+                     funcs.omission_reason),
+                   E'\n' order by (funcs.proname :: text) COLLATE "C",
+                                 (funcs.arg_tokens :: text) COLLATE "C")
+       end as omitted_function_signatures
+  from my_functions funcs
+ where funcs.omission_reason is not null \gset
+\echo :omitted_function_signatures
 
 SELECT format('type Domains = ''[%s]',
 	 coalesce(string_agg(format(E'"%s" ::: ''Typedef PG%s',

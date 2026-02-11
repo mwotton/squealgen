@@ -64,6 +64,8 @@ spec = describe "Functions" $ do
         hs `shouldContain` "\"overloaded__int4\" ::: Function ('[ Null PGint4 ] :=> 'Returns ( 'Null PGint4) )"
         hs `shouldContain` "\"overloaded__int8\" ::: Function ('[ Null PGint8 ] :=> 'Returns ( 'Null PGint8) )"
         hs `shouldContain` "\"zero_arg\" ::: Function ('[  ] :=> 'Returns ( 'Null PGint8) )"
+        hs `shouldContain` "-- Omitted function signatures:"
+        hs `shouldContain` "--   inout_params(int8): OUT/INOUT/TABLE parameters are not yet representable"
 
 runGenerator :: IO String
 runGenerator = withDbCache $ \cache -> do
