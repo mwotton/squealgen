@@ -76,6 +76,7 @@ test-suite tests
       NoConstraints.DBSpec
       NoConstraints.Public
       PgCatalog.DBSpec
+      Property.DDLHarnessSpec
       Property.DDLSpec
       Triggers.DBSpec
       Triggers.Public
