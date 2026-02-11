@@ -119,6 +119,10 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
     makefile <- readFile "Makefile"
     makefile `shouldSatisfy` ("check-squealgen-drift" `isInfixOf`)
 
+  it "workflow tests do not depend on make-specific exit-code numerics" $ do
+    source <- readFile "test/CheckSchemaScript/DBSpec.hs"
+    source `shouldSatisfy` (not . isInfixOf "driftExit `shouldBe` ExitFailure 2")
+
   it "make ci target chains local validation and coverage gate" $ do
     makefile <- readFile "Makefile"
     makefile `shouldSatisfy` (".PHONY: ci" `isInfixOf`)
