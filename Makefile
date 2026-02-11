@@ -15,6 +15,15 @@ test: check-squealgen-drift squealgen $(testTargets)
 	@echo "testtargets: " $(testTargets)
 	cabal test --test-show-details=direct --ghc-option=-fprint-potential-instances
 
+.PHONY: ci
+ci: test
+	@echo "Validation contract [ci]: running coverage gate"
+	@./check_coverage.sh || { \
+		code=$$?; \
+		echo "Validation contract failure [ci]: ./check_coverage.sh" >&2; \
+		exit $$code; \
+	}
+
 foo:
 	echo $(testTargets)
 clean:

@@ -125,13 +125,13 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
     makefile `shouldSatisfy` ("ci: test" `isInfixOf`)
     makefile `shouldSatisfy` ("./check_coverage.sh" `isInfixOf`)
 
-  it "CI invokes canonical make test gate" $ do
+  it "CI invokes canonical make ci gate" $ do
     workflow <- readFile ".github/workflows/ci.yml"
-    workflow `shouldSatisfy` ("run: make test" `isInfixOf`)
+    workflow `shouldSatisfy` ("run: make ci" `isInfixOf`)
 
-  it "CI includes the coverage gate command" $ do
+  it "CI does not bypass make ci with a direct coverage command" $ do
     workflow <- readFile ".github/workflows/ci.yml"
-    workflow `shouldSatisfy` ("run: ./check_coverage.sh" `isInfixOf`)
+    workflow `shouldSatisfy` (not . isInfixOf "run: ./check_coverage.sh")
 
   it "coverage gate fails when expression denominator is zero" $ do
     repoRoot <- getCurrentDirectory

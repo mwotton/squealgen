@@ -38,6 +38,11 @@ My workflow looks like this:
 Treat `squealgen.sql` as the source of truth and do not edit `squealgen` directly.
 `./check_squealgen_drift.sh` is run by `make test` and CI to enforce this.
 
+Validation contract:
+
+- Local validation (`make test`): enforce `squealgen` drift parity and run the Haskell test suite.
+- CI validation (`make ci`): run `make test` plus `./check_coverage.sh` coverage policy gate.
+
 you'll need
 
 - `initdb` from postgresql to be in your PATH. It typically isn't on Ubuntu systems, at least: usually in /usr/lib/postgresql/$VERSION_NUMBER/bin.

@@ -42,11 +42,8 @@ jobs:
       - name: Build
         run: cabal build all
 
-      - name: Test and enforce generated fixture parity
-        run: make test
-
-      - name: Enforce source coverage policy
-        run: ./check_coverage.sh
+      - name: Validation contract (CI)
+        run: make ci
 
       - name: Upload coverage report
         if: always()
