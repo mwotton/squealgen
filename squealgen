@@ -682,4 +682,112 @@ from (
     and dn.nspname = :'chosen_schema'
 ) fallback_checks \gset
 \echo :omitted_fallback_check_constraints
+
+create temporary view triggerDefs as (
+  select t.oid as tgoid,
+         t.tgname as trigger_name,
+         rel.relname as relation_name,
+         case
+           when (t.tgtype & 2) <> 0 then 'BEFORE'
+           when (t.tgtype & 64) <> 0 then 'INSTEAD OF'
+           else 'AFTER'
+         end as trigger_timing,
+         case
+           when (t.tgtype & 1) <> 0 then 'ROW'
+           else 'STATEMENT'
+         end as trigger_level,
+         array_to_string(
+           array_remove(
+             array[
+               case when (t.tgtype & 4) <> 0 then 'INSERT' end,
+               case when (t.tgtype & 8) <> 0 then 'DELETE' end,
+               case when (t.tgtype & 16) <> 0 then 'UPDATE' end,
+               case when (t.tgtype & 32) <> 0 then 'TRUNCATE' end
+             ],
+             null
+           ),
+           ' OR '
+         ) as trigger_events,
+         (t.tgconstraint <> 0) as is_constraint_trigger,
+         pg_catalog.pg_get_triggerdef(t.oid, true) as trigger_definition
+  from pg_catalog.pg_trigger t
+  join pg_catalog.pg_class rel
+    on rel.oid = t.tgrelid
+  join pg_catalog.pg_namespace n
+    on n.oid = rel.relnamespace
+  where n.nspname = :'chosen_schema'
+    and not t.tgisinternal
+);
+
+\echo
+\echo -- triggers
+select case
+         when count(*) = 0 then E'type Triggers = \n  ''[]'
+         else format(
+           E'type Triggers = \n  ''[ %s ]',
+           string_agg(
+             format(
+               E'''("%s", "%s")',
+               replace(td.trigger_name, '"', E'\\\"'),
+               replace(
+                 replace(
+                   coalesce(
+                     td.trigger_definition,
+                     format(
+                       '%s %s %s ON %s%s',
+                       td.trigger_timing,
+                       td.trigger_level,
+                       td.trigger_events,
+                       td.relation_name,
+                       case when td.is_constraint_trigger then ' [constraint]' else '' end
+                     )
+                   ),
+                   E'\\',
+                   E'\\\\'
+                 ),
+                 '"',
+                 E'\\\"'
+               )
+             ),
+             E'\n   , ' order by (td.trigger_name :: text) COLLATE "C"
+           )
+         )
+       end as triggers
+  from triggerDefs td \gset
+\echo :triggers
+
+select coalesce(
+         string_agg(
+           format(
+             E'-- | Trigger %s on %s: full definition unavailable, emitted metadata fallback.',
+             td.trigger_name,
+             td.relation_name
+           ),
+           E'\n' order by (td.trigger_name :: text) COLLATE "C"
+         ),
+         ''
+       ) as fallback_trigger_haddocks
+  from triggerDefs td
+ where td.trigger_definition is null \gset
+\echo :fallback_trigger_haddocks
+
+select case
+         when count(*) = 0 then '-- Omitted/fallback triggers: none'
+         else E'-- Omitted/fallback triggers:\n'
+              || string_agg(
+                   format(
+                     E'--   %s on %s: full definition unavailable; emitted metadata fallback (%s %s %s%s)',
+                     td.trigger_name,
+                     td.relation_name,
+                     td.trigger_timing,
+                     td.trigger_level,
+                     td.trigger_events,
+                     case when td.is_constraint_trigger then ', constraint trigger' else '' end
+                   ),
+                   E'\n' order by (td.trigger_name :: text) COLLATE "C"
+                 )
+       end as omitted_fallback_triggers
+  from triggerDefs td
+ where td.trigger_definition is null \gset
+\echo :omitted_fallback_triggers
 EOF
