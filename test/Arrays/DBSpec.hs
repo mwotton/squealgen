@@ -8,9 +8,10 @@ import qualified Generics.SOP as SOP
 import qualified GHC.Generics as GHC
 import Test.Hspec
 import Arrays.Public
+import DBHelpers (runSession)
 import Squeal.PostgreSQL
+import qualified Data.ByteString.Char8 as BS8
 import Data.Text
-import Data.Set
 
 data TextArrays = TextArrays { name :: [Text] }
   deriving stock (Show, GHC.Generic, Eq)
@@ -21,6 +22,7 @@ getFoos = Query nilParams (TextArrays . getVarArray <$> #name)
           $ select_ #name (from $ table #text_arrays)
 
 spec = describe "Arrays" $ do
-  it "compiles" $ do
-    -- nothing to do on an empty database
-    'a' `shouldBe` 'a'
+  it "round-trips text arrays via runtime query" $
+    runSession "Arrays" "Public" (do
+      getRows =<< execute getFoos)
+      `shouldReturn` [TextArrays ["alpha", "beta"]]
