@@ -96,6 +96,7 @@ spec = describe "Functions" $ do
     case e of
       Left err -> expectationFailure ("setup failed: " <> displayException err)
       Right hs -> do
+        hs `shouldNotContain` "\"oid\" ::: 'NoDef :=> 'NotNull PGoid"
         hs `shouldContain` "\"overloaded__int4\" ::: Function ('[ Null PGint4 ] :=> 'Returns ( 'Null PGint4) )"
         hs `shouldContain` "\"overloaded__int8\" ::: Function ('[ Null PGint8 ] :=> 'Returns ( 'Null PGint8) )"
         hs `shouldContain` "\"zero_arg\" ::: Function ('[  ] :=> 'Returns ( 'Null PGint8) )"
