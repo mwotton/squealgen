@@ -37,6 +37,10 @@ My workflow looks like this:
 `squealgen` is generated from `squealgen.sql` via `./mksquealgen.sh`.
 Treat `squealgen.sql` as the source of truth and do not edit `squealgen` directly.
 `./check_squealgen_drift.sh` is run by `make test` and CI to enforce this.
+`check_squealgen_drift.sh` supports `SQUEALGEN_DRIFT_MODE=auto|git|non-git`:
+- `auto` (default): use strict git diff checks in a worktree, otherwise compare pre/post regenerated `./squealgen` bytes + executable bit in fallback mode.
+- `git`: require a git worktree and fail if unavailable.
+- `non-git`: force fallback comparison mode.
 
 Validation contract:
 
