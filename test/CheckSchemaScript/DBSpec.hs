@@ -118,6 +118,18 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
       (cleanExit, _, _) <- readCreateProcessWithExitCode (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_squealgen_drift.sh"]) ""
       cleanExit `shouldBe` ExitSuccess
 
+  it "squealgen.sql contains a single stripDoublequotes definition" $ do
+    sql <- readFile "squealgen.sql"
+    countOccurrences "CREATE or replace FUNCTION pg_temp.stripDoublequotes" sql `shouldBe` 1
+
+  it "cross-schema and pg_catalog specs use shared runSquealgen helper" $ do
+    crossSchema <- readFile "test/CrossSchemaEnums/DBSpec.hs"
+    pgCatalog <- readFile "test/PgCatalog/DBSpec.hs"
+    crossSchema `shouldSatisfy` ("runSquealgenScript" `isInfixOf`)
+    pgCatalog `shouldSatisfy` ("runSquealgenScript" `isInfixOf`)
+    crossSchema `shouldSatisfy` (not . isInfixOf "runSquealgen ::")
+    pgCatalog `shouldSatisfy` (not . isInfixOf "runSquealgen ::")
+
 makeExecutable :: FilePath -> IO ()
 makeExecutable path = do
   perms <- getPermissions path
@@ -135,3 +147,18 @@ runInRepo dir command = do
     ExitSuccess -> pure ()
     ExitFailure code -> expectationFailure $
       "command failed (" <> show code <> "): " <> command <> "\n" <> err
+
+countOccurrences :: Eq a => [a] -> [a] -> Int
+countOccurrences needle haystack
+  | null needle = 0
+  | otherwise = go haystack 0
+  where
+    go [] n = n
+    go s@(_:xs) n
+      | needle `isPrefixOf` s = go xs (n + 1)
+      | otherwise = go xs n
+
+isPrefixOf :: Eq a => [a] -> [a] -> Bool
+isPrefixOf [] _          = True
+isPrefixOf _ []          = False
+isPrefixOf (x:xs) (y:ys) = x == y && isPrefixOf xs ys
