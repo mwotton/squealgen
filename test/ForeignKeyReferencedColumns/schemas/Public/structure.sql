@@ -5,7 +5,7 @@ CREATE TABLE public.parent_single (
 );
 
 CREATE TABLE public.child_single (
-  local_parent_id integer,
+  local_parent_id integer NOT NULL,
   CONSTRAINT child_single_parent_fk FOREIGN KEY (local_parent_id)
     REFERENCES public.parent_single (id)
 );
@@ -17,8 +17,8 @@ CREATE TABLE public.parent_composite (
 );
 
 CREATE TABLE public.child_composite (
-  local_b integer,
-  local_a integer,
+  local_b integer NOT NULL,
+  local_a integer NOT NULL,
   CONSTRAINT child_composite_parent_fk FOREIGN KEY (local_b, local_a)
     REFERENCES public.parent_composite (ref_b, ref_a)
 );
@@ -30,8 +30,8 @@ CREATE TABLE ref.parent_cross (
 );
 
 CREATE TABLE public.child_cross (
-  left_local integer,
-  right_local integer,
+  left_local integer NOT NULL,
+  right_local integer NOT NULL,
   CONSTRAINT child_cross_parent_fk FOREIGN KEY (left_local, right_local)
     REFERENCES ref.parent_cross (target_left, target_right)
 );

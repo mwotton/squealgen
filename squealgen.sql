@@ -318,10 +318,10 @@ LEFT OUTER JOIN pg_catalog.pg_namespace AS fnsp
 ON ftab.relnamespace = fnsp.oid
 --LEFT OUTER JOIN pg_catalog.pg_attribute AS fcol
 --ON con.confkey @> ARRAY[fcol.attnum] AND con.confrelid = fcol.attrelid
-LEFT JOIN LATERAL (select array_agg (all fcol.attname ORDER BY array_position(con.conkey, fcol.attnum) ASC) fcols
+LEFT JOIN LATERAL (select array_agg (all fcol.attname ORDER BY array_position(con.confkey, fcol.attnum) ASC) fcols
 		   from pg_catalog.pg_attribute fcol
 		   where con.confkey @> ARRAY[fcol.attnum]
-		   and con.conrelid = fcol.attrelid
+		   and con.confrelid = fcol.attrelid
 		   ) fcol on true
 WHERE con.contype IN ('f', 'c', 'p', 'u')
 AND  n.nspname=:'chosen_schema'
