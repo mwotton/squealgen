@@ -9,14 +9,11 @@ import qualified Data.ByteString.Char8    as BS8
 import           Data.Int
 import           Data.List               (sort)
 import           Database.Postgres.Temp   (cacheConfig, withConfig, withDbCache, toConnectionString)
-import           DBHelpers         (runSession)
+import           DBHelpers               (runSession, runSquealgenScript)
 import           Functions.Public
 import qualified Generics.SOP      as SOP
 import qualified GHC.Generics      as GHC
 import           Squeal.PostgreSQL
-import           System.Exit              (ExitCode (..))
-import qualified System.IO                as IO
-import           System.Process           (proc, readCreateProcessWithExitCode)
 import           Test.Hspec
 
 -- interesting to note that we are collecting the raw int names, like int4 and int8.
@@ -110,23 +107,7 @@ runGenerator = withDbCache $ \cache -> do
     let connBS = toConnectionString db
     sql <- BS8.readFile "./test/Functions/schemas/Public/structure.sql"
     withConnection connBS $ define (UnsafeDefinition sql)
-    runSquealgen (BS8.unpack connBS) "FunctionsGenerated" "public"
+    runSquealgenScript (BS8.unpack connBS) "FunctionsGenerated" "public"
   case result of
     Left err -> ioError (userError (displayException err))
     Right out -> pure out
-
-runSquealgen :: String -> String -> String -> IO String
-runSquealgen conn moduleName' chosen = do
-  script <- IO.readFile "squealgen.sql"
-  let cmd = proc "psql"
-        [ "-X"
-        , "-q"
-        , "-v", "chosen_schema=" <> chosen
-        , "-v", "modulename=" <> moduleName'
-        , "-v", "extra_imports="
-        , "-d", conn
-        ]
-  (exitCode, out, err) <- readCreateProcessWithExitCode cmd script
-  case exitCode of
-    ExitSuccess   -> pure out
-    ExitFailure c -> ioError (userError (unlines ["psql exited with code " <> show c, err]))

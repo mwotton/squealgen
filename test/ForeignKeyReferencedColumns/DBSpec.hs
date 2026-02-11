@@ -11,13 +11,10 @@ import           ForeignKeyReferencedColumns.Public
 import           Data.Int                 (Int32)
 import qualified Generics.SOP             as SOP
 import qualified GHC.Generics             as GHC
-import           System.Exit              (ExitCode (..))
-import           System.IO                as IO
-import           System.Process           (proc, readCreateProcessWithExitCode)
 import           Test.Hspec               (Spec, describe, it, shouldContain, expectationFailure)
 import           Test.Hspec.Expectations.Lifted (shouldBe)
 import           Squeal.PostgreSQL
-import           DBHelpers                (runSession)
+import           DBHelpers                (runSession, runSquealgenScript)
 
 data ChildSingleRow = ChildSingleRow { local_parent_id :: Int32 }
   deriving stock (Show, GHC.Generic, Eq)
@@ -89,23 +86,7 @@ run = withDbCache $ \cache -> do
     let connBS = toConnectionString db
     setup <- BS8.readFile "test/ForeignKeyReferencedColumns/schemas/Public/structure.sql"
     withConnection connBS $ define (UnsafeDefinition setup)
-    runSquealgen (BS8.unpack connBS) "ForeignKeyReferencedColumns.Generated" "public"
+    runSquealgenScript (BS8.unpack connBS) "ForeignKeyReferencedColumns.Generated" "public"
   case e of
     Left err -> ioError (userError (displayException err))
     Right x  -> pure x
-
-runSquealgen :: String -> String -> String -> IO String
-runSquealgen conn moduleName' chosen = do
-  script <- IO.readFile "squealgen.sql"
-  let cmd = proc "psql"
-        [ "-X"
-        , "-q"
-        , "-v", "chosen_schema=" <> chosen
-        , "-v", "modulename=" <> moduleName'
-        , "-v", "extra_imports="
-        , "-d", conn
-        ]
-  (exitCode, out, err) <- readCreateProcessWithExitCode cmd script
-  case exitCode of
-    ExitSuccess   -> pure out
-    ExitFailure c -> ioError (userError (unlines ["psql exited with code " <> show c, err]))

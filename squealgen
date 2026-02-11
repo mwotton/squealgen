@@ -63,14 +63,6 @@ $$
 LANGUAGE sql;
 
 
-CREATE or replace FUNCTION pg_temp.stripDoublequotes(arr text[]) RETURNS text[] AS $$
-begin
-   return array_agg(regexp_replace(component.f, '"+', '', 'g')) from unnest(arr) as component(f);
-end;
-$$
-LANGUAGE plpgsql;
-
-
 create or replace function pg_temp.haddock_comment(message text, indent text default '')
   returns text as $$
   select case
