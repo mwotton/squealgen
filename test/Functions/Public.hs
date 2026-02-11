@@ -68,3 +68,11 @@ type Functions =
 -- Omitted SRF signatures:
 --   srf_any(anyelement): set-returning pseudotype return is not representable
 type Domains = '[]
+
+-- Omitted/fallback check constraints: none
+
+-- triggers
+type Triggers = 
+  '[]
+
+-- Omitted/fallback triggers: none

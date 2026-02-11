@@ -51,24 +51,32 @@ type AuditLogConstraints = '[]
 type AuditLogTable = AuditLogConstraints :=> AuditLogColumns
 
 -- VIEWS
-type Views =
+type Views = 
   '["account_view" ::: 'View AccountViewView]
 
-type AccountViewView =
+type AccountViewView = 
   '["id" ::: 'Null PGint4
    ,"balance" ::: 'Null PGint8
    ,"status" ::: 'Null PGtext]
 
 -- functions
-type Functions =
+type Functions = 
   '[  ]
+-- Omitted function signatures:
+--   account_view_iou(noargs): pseudotype return is not representable
+--   check_balance_not_negative(noargs): pseudotype return is not representable
+--   log_account_row(noargs): pseudotype return is not representable
+--   log_account_stmt(noargs): pseudotype return is not representable
+-- Omitted SRF signatures: none
 type Domains = '[]
 
+-- Omitted/fallback check constraints: none
+
 -- triggers
-type Triggers =
-  '[ '("accounts_after_stmt", "AFTER:STATEMENT:DELETE")
-   , '("accounts_balance_guard", "AFTER:ROW:INSERT OR UPDATE:CONSTRAINT")
-   , '("accounts_before_row", "BEFORE:ROW:INSERT OR UPDATE")
-   , '("account_view_instead_row", "INSTEAD OF:ROW:INSERT OR UPDATE OR DELETE")
-   ]
+type Triggers = 
+  '[ '("account_view_instead_row", "CREATE TRIGGER account_view_instead_row INSTEAD OF INSERT OR DELETE OR UPDATE ON account_view FOR EACH ROW EXECUTE FUNCTION account_view_iou()")
+   , '("accounts_after_stmt", "CREATE TRIGGER accounts_after_stmt AFTER DELETE ON accounts FOR EACH STATEMENT EXECUTE FUNCTION log_account_stmt()")
+   , '("accounts_balance_guard", "CREATE CONSTRAINT TRIGGER accounts_balance_guard AFTER INSERT OR UPDATE ON accounts DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_balance_not_negative()")
+   , '("accounts_before_row", "CREATE TRIGGER accounts_before_row BEFORE INSERT OR UPDATE ON accounts FOR EACH ROW EXECUTE FUNCTION log_account_row()") ]
+
 -- Omitted/fallback triggers: none

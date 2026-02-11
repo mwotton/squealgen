@@ -47,9 +47,17 @@ type AddressSetsTable = AddressSetsConstraints :=> AddressSetsColumns
 type Views = 
   '[]
 
-
 -- functions
 type Functions = 
   '[  ]
+-- Omitted function signatures: none
+-- Omitted SRF signatures: none
 type Domains = '[]
 
+-- Omitted/fallback check constraints: none
+
+-- triggers
+type Triggers = 
+  '[]
+
+-- Omitted/fallback triggers: none

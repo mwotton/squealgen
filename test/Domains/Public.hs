@@ -47,9 +47,18 @@ type PlusloveTable = PlusloveConstraints :=> PlusloveColumns
 type Views = 
   '[]
 
-
 -- functions
 type Functions = 
   '[ "increment_positive" ::: Function ('[ NotNull PGpositive ] :=> 'Returns ( 'Null PGpositive) ) ]
+-- Omitted function signatures: none
+-- Omitted SRF signatures: none
 type Domains = '["positive" ::: 'Typedef PGint8]
 type PGpositive = PGint8
+-- Omitted/fallback check constraints:
+--   domain public.positive positive_check: not representable in Domains typedef output (CHECK (VALUE > 0 AND VALUE IS NOT NULL))
+
+-- triggers
+type Triggers = 
+  '[]
+
+-- Omitted/fallback triggers: none

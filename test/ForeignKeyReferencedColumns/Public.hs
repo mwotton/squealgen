@@ -21,6 +21,7 @@ type PGcidr = UnsafePGType "cidr"
 type PGltxtquery = UnsafePGType "ltxtquery"
 type PGlquery = UnsafePGType "lquery"
 
+
 type DB = '["public" ::: Schema]
 
 type Schema = Join Tables (Join Views (Join Enums (Join Functions (Join Composites Domains))))
@@ -73,10 +74,20 @@ type SelfRefConstraints = '["self_ref_parent_fk" ::: 'ForeignKey '["parent_local
 type SelfRefTable = SelfRefConstraints :=> SelfRefColumns
 
 -- VIEWS
-type Views =
+type Views = 
   '[]
 
 -- functions
-type Functions =
+type Functions = 
   '[  ]
+-- Omitted function signatures: none
+-- Omitted SRF signatures: none
 type Domains = '[]
+
+-- Omitted/fallback check constraints: none
+
+-- triggers
+type Triggers = 
+  '[]
+
+-- Omitted/fallback triggers: none

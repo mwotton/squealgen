@@ -72,3 +72,9 @@ type PGpositive_amount = PGint8
 --   public.checked_accounts balance_nonnegative: expression emitted as Haddock note only (CHECK (balance >= 0))
 --   public.checked_accounts literal_true: expression emitted as Haddock note only (CHECK (1 = 1))
 --   public.checked_accounts status_guard: expression emitted as Haddock note only (CHECK (status IS NULL OR char_length(status) > 0))
+
+-- triggers
+type Triggers = 
+  '[]
+
+-- Omitted/fallback triggers: none
