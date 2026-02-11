@@ -79,9 +79,9 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
     makefile <- readFile "Makefile"
     makefile `shouldSatisfy` ("check-squealgen-drift" `isInfixOf`)
 
-  it "CI invokes squealgen drift check" $ do
+  it "CI invokes canonical make test gate" $ do
     workflow <- readFile ".github/workflows/ci.yml"
-    workflow `shouldSatisfy` ("check_squealgen_drift.sh" `isInfixOf`)
+    workflow `shouldSatisfy` ("run: make test" `isInfixOf`)
 
   it "drift checker fails on SQL and mode drift, then passes after regeneration" $ do
     repoRoot <- getCurrentDirectory
