@@ -47,6 +47,27 @@ begin
 end;
 $$ language plpgsql;
 
+create type score_row as (num int8, label text);
+
+create function srf_scalar(limit_n int8) returns setof int8 as $$
+  select generate_series(1, limit_n);
+$$ language sql;
+
+create function srf_composite() returns setof score_row as $$
+  select (g, 'label-' || g::text)::score_row
+  from generate_series(1, 2) as g;
+$$ language sql;
+
+create function srf_table(seed int8)
+returns table (out_num int8, out_text text) as $$
+  select seed, 'seed-' || seed::text
+  union all
+  select seed + 1, 'seed-' || (seed + 1)::text;
+$$ language sql;
+
+create function srf_any(anyelement) returns setof anyelement as $$
+  select $1;
+$$ language sql;
 
 create function many_params(one int8,two real,three text) returns text as $$
   select three;
