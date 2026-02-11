@@ -19,11 +19,12 @@ import           System.Timeout           (timeout)
 import           Debug.Trace              (traceM)
 import           System.Environment       (lookupEnv)
 import           Data.Char                (toLower)
-import           Data.IORef               (IORef, newIORef, atomicModifyIORef')
+import           Data.IORef               (IORef, atomicModifyIORef', newIORef, readIORef, writeIORef)
 import           Test.Falsify.Generator   (Gen)
 import qualified Test.Falsify.Generator   as Gen
 import qualified Test.Falsify.Range       as Range
-import           Test.Tasty               (TestTree, testGroup)
+import           Test.Tasty               (TestTree, localOption, testGroup)
+import           Test.Tasty.Runners       (NumThreads (NumThreads))
 import           Control.Monad            (when)
 import           Test.Tasty.Falsify
 
@@ -31,10 +32,11 @@ compileTimeoutMicros :: Int
 compileTimeoutMicros = 60 * 1000 * 1000
 
 testTree :: TestTree
-testTree = testGroup "Property.DDL"
+testTree = localOption (NumThreads 1) $ testGroup "Property.DDL"
   [ testProperty "DDL generator produces squeal schemas that compile" ddlProperty
   , testProperty "Generated module fails when invalid code is appended" ddlInvalidAppendProperty
   , testProperty "Large schema (500 tables) compiles within 30s" ddlLargeSchemaCompilesQuickly
+  , testProperty "All Property.DDL cases execute each suite run" ddlAllCasesExecutedProperty
   ]
 
 ddlProperty :: Property ()
@@ -55,6 +57,8 @@ ddlProperty = do
 -- Append invalid Haskell to a generated module and ensure compilation fails
 ddlInvalidAppendProperty :: Property ()
 ddlInvalidAppendProperty = runOnce $ do
+  case unsafePerformIO (writeIORef ddlInvalidAppendExecutedRef True) of
+    () -> pure ()
   let schema = SchemaDDL "CREATE TABLE gen_table_1 (id SERIAL PRIMARY KEY)\n"
   traceIf "--- Creating simple schema for invalid append test ---"
   case unsafePerformIO (checkSchema schema) of
@@ -78,6 +82,14 @@ runOnce body =
   if unsafePerformIO (atomicModifyIORef' runOnceRef (\ran -> (True, ran)))
     then pure ()
     else body
+
+{-# NOINLINE ddlInvalidAppendExecutedRef #-}
+ddlInvalidAppendExecutedRef :: IORef Bool
+ddlInvalidAppendExecutedRef = unsafePerformIO (newIORef False)
+
+{-# NOINLINE ddlLargeSchemaExecutedRef #-}
+ddlLargeSchemaExecutedRef :: IORef Bool
+ddlLargeSchemaExecutedRef = unsafePerformIO (newIORef False)
 
 -- Using Debug.Trace.traceM to emit immediate stderr output during property runs
 
@@ -193,6 +205,8 @@ largeSchema n =
 -- Property: a 500-table schema should compile within 30 seconds
 ddlLargeSchemaCompilesQuickly :: Property ()
 ddlLargeSchemaCompilesQuickly = runOnce $ do
+  case unsafePerformIO (writeIORef ddlLargeSchemaExecutedRef True) of
+    () -> pure ()
   let tables = 500
       timeoutSeconds = 30
       schema = largeSchema tables
@@ -200,6 +214,15 @@ ddlLargeSchemaCompilesQuickly = runOnce $ do
   case unsafePerformIO (compileLargeSchemaWithin schema timeoutSeconds) of
     Left err -> testFailed ("large schema compile failed or timed out: " <> err)
     Right () -> pure ()
+
+ddlAllCasesExecutedProperty :: Property ()
+ddlAllCasesExecutedProperty = do
+  let ranInvalid = unsafePerformIO (readIORef ddlInvalidAppendExecutedRef)
+      ranLarge = unsafePerformIO (readIORef ddlLargeSchemaExecutedRef)
+  when (not ranInvalid) $
+    testFailed "invalid-append property body did not execute"
+  when (not ranLarge) $
+    testFailed "large-schema property body did not execute"
 
 compileLargeSchemaWithin :: SchemaDDL -> Int -> IO (Either String ())
 compileLargeSchemaWithin schema timeoutSeconds = fmap (either (Left . displayException) id) . try @SomeException $ do
