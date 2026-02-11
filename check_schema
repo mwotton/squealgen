@@ -3,11 +3,11 @@
 tmp=$1
 existing=$2
 
-if [ -f $existing ]; then
-        diff --suppress-common-lines $tmp $existing ;
-	if [ $? -ne 0 ]; then
-		echo "file $tmp doesn't match $existing";
-		#  exit 1;
-	fi;
+if [ -f "$existing" ]; then
+  if ! diff --suppress-common-lines "$tmp" "$existing"; then
+    echo "error: generated file '$tmp' does not match existing file '$existing'"
+    echo "refusing to overwrite mismatched file"
+    exit 1
+  fi
 fi;
-cp "$tmp" "$existing";
+cp "$tmp" "$existing"
