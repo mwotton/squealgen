@@ -1,4 +1,8 @@
 # Coverage exclusion allowlist for src/**/*.hs
-# Format: Module.Name|Rationale
-# One module per line. Rationale is required for each entry.
+# Format: Selector|Rationale
+# Selector forms:
+#   Module.Name
+#   Module.Name:line
+#   Module.Name:start-end
+# Rationale is required for each entry.
 # Generated modules are excluded by scope because coverage only includes src/**/*.hs.
