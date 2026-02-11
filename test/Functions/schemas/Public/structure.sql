@@ -21,6 +21,14 @@ create function overloaded(int8) returns int8 as $$
   select $1 + 2;
 $$ language sql;
 
+create function legacy_alias(int8) returns int8 as $$
+  select $1 + 3;
+$$ language sql;
+
+create function legacy_alias(anyelement) returns anyelement as $$
+  select $1;
+$$ language sql;
+
 create function zero_arg() returns int8 as $$
   select 42;
 $$ language sql;
