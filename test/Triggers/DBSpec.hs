@@ -2,10 +2,7 @@
 module Triggers.DBSpec where
 
 import           Control.Exception      (SomeException, displayException, try)
-import qualified Data.ByteString.Char8  as BS8
-import           Database.Postgres.Temp  (cacheConfig, withConfig, withDbCache, toConnectionString)
-import           DBHelpers              (runSquealgenScript)
-import           Squeal.PostgreSQL      (Definition (UnsafeDefinition), define, withConnection)
+import           DBHelpers              (runGeneratorFromSchema)
 import           Test.Hspec
 import           Triggers.Public        ()
 
@@ -31,12 +28,9 @@ spec = describe "Triggers" $ do
         hs `shouldNotContain` "private_only_trigger"
 
 runGenerator :: IO String
-runGenerator = withDbCache $ \cache -> do
-  result <- withConfig (cacheConfig cache) $ \db -> do
-    let connBS = toConnectionString db
-    sql <- BS8.readFile "./test/Triggers/schemas/Public/structure.sql"
-    withConnection connBS $ define (UnsafeDefinition sql)
-    runSquealgenScript (BS8.unpack connBS) "Triggers.Generated" "public"
-  case result of
-    Left err -> ioError (userError (displayException err))
+runGenerator = do
+  e <- try @SomeException $
+    runGeneratorFromSchema "./test/Triggers/schemas/Public/structure.sql" "Triggers.Generated" "public"
+  case e of
+    Left err  -> ioError (userError (displayException err))
     Right out -> pure out

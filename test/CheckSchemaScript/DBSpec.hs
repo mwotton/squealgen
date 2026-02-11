@@ -71,9 +71,49 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
       env <- overridePath fakeBin <$> getEnvironment
       let cmd = (proc "bash" ["buildTestSchema.sh", basedir, "Public"]) { cwd = Just tmpDir, env = Just env }
 
-      (exitCode, _, _) <- readCreateProcessWithExitCode cmd ""
+      (exitCode, out, err) <- readCreateProcessWithExitCode cmd ""
       exitCode `shouldBe` ExitFailure 1
+      (out <> err) `shouldSatisfy` ("refusing to overwrite mismatched file" `isInfixOf`)
       readFile existing `shouldReturn` "old generated module\n"
+
+  it "make test fails on drift and passes in clean state" $ do
+    repoRoot <- getCurrentDirectory
+    withSystemTempDirectory "make-test-drift-check" $ \tmpDir -> do
+      let driftScript = tmpDir </> "check_squealgen_drift.sh"
+          mkScript = tmpDir </> "mksquealgen.sh"
+          makefile = tmpDir </> "Makefile"
+          sqlFile = tmpDir </> "squealgen.sql"
+          fakeBin = tmpDir </> "bin"
+          fakeCabal = fakeBin </> "cabal"
+      copyFile (repoRoot </> "check_squealgen_drift.sh") driftScript
+      copyFile (repoRoot </> "mksquealgen.sh") mkScript
+      copyFile (repoRoot </> "Makefile") makefile
+      makeExecutable driftScript
+      makeExecutable mkScript
+      createDirectoryIfMissing True fakeBin
+      writeFile fakeCabal "#!/usr/bin/env bash\nexit 0\n"
+      makeExecutable fakeCabal
+      writeFile sqlFile "select 1;\n"
+
+      runInRepo tmpDir "bash ./mksquealgen.sh"
+      runInRepo tmpDir "git init -q"
+      runInRepo tmpDir "git config user.email test@example.com"
+      runInRepo tmpDir "git config user.name test"
+      runInRepo tmpDir "git add squealgen.sql squealgen mksquealgen.sh check_squealgen_drift.sh Makefile"
+      runInRepo tmpDir "git commit -q -m init"
+
+      env <- overridePath fakeBin <$> getEnvironment
+      let makeTestCmd = (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && make test"]) { env = Just env }
+
+      (cleanExit, _, cleanErr) <- readCreateProcessWithExitCode makeTestCmd ""
+      cleanExit `shouldBe` ExitSuccess
+      cleanErr `shouldSatisfy` (not . isInfixOf "ERROR: your generated squealgen")
+
+      writeFile sqlFile "select 2;\n"
+      (driftExit, _, driftErr) <- readCreateProcessWithExitCode makeTestCmd ""
+      driftExit `shouldBe` ExitFailure 2
+      driftErr `shouldSatisfy` ("squealgen drift detected" `isInfixOf`)
+      driftErr `shouldSatisfy` ("./mksquealgen.sh" `isInfixOf`)
 
   it "make test invokes squealgen drift check" $ do
     makefile <- readFile "Makefile"
@@ -82,6 +122,10 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
   it "CI invokes canonical make test gate" $ do
     workflow <- readFile ".github/workflows/ci.yml"
     workflow `shouldSatisfy` ("run: make test" `isInfixOf`)
+
+  it "CI includes the coverage gate command" $ do
+    workflow <- readFile ".github/workflows/ci.yml"
+    workflow `shouldSatisfy` ("run: ./check_coverage.sh" `isInfixOf`)
 
   it "drift checker fails on SQL and mode drift, then passes after regeneration" $ do
     repoRoot <- getCurrentDirectory

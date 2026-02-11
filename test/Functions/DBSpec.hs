@@ -9,7 +9,7 @@ import qualified Data.ByteString.Char8    as BS8
 import           Data.Int
 import           Data.List               (sort)
 import           Database.Postgres.Temp   (cacheConfig, withConfig, withDbCache, toConnectionString)
-import           DBHelpers               (runSession, runSquealgenScript)
+import           DBHelpers               (runGeneratorFromSchema, runSession)
 import           Functions.Public
 import qualified Generics.SOP      as SOP
 import qualified GHC.Generics      as GHC
@@ -24,13 +24,13 @@ import           Test.Hspec
 
 multiArgQuery :: Statement DB () (Only (Maybe Int64))
 multiArgQuery = query $
-  select_ ((functionN #somefunc) ((12 & notNull)
-                                 *: notNull (#integers ! #num)) `as` #fromOnly)
+  select_ ((functionN #somefunc) ((12 & just_)
+                                 *: just_ (#integers ! #num)) `as` #fromOnly)
   (from (table #integers))
 
 doublerQuery :: Statement DB () (Only (Maybe Int64))
 doublerQuery = query $
-  select_ ((function #doubler) (notNull $ #integers ! #num) `as` #fromOnly)
+  select_ ((function #doubler) (just_ $ #integers ! #num) `as` #fromOnly)
   (from (table #integers))
 
 -- | in this test, the inputs are defined to be not-null, because strict_doubler is annotated as strict.
@@ -49,14 +49,14 @@ outOnlyQuery = query $
 
 inoutOnlyQuery :: Statement DB () (Only (Maybe Int64))
 inoutOnlyQuery = query $
-  values_ ((function #inout_only) (3 & notNull) `as` #fromOnly)
+  values_ ((function #inout_only) (3 & just_) `as` #fromOnly)
 
 mixedInInoutQuery :: Statement DB () (Only (Maybe Int64))
 mixedInInoutQuery = query $
-  values_ ((functionN #mixed_in_inout) ((4 & notNull) *: (6 & notNull)) `as` #fromOnly)
+  values_ ((functionN #mixed_in_inout) ((4 & just_) *: (6 & just_)) `as` #fromOnly)
 
 procIncrement :: Statement DB () ()
-procIncrement = manipulation $ call #proc_increment (5 & notNull)
+procIncrement = manipulation $ call #proc_increment (5 & just_)
 
 integersQuery :: Statement DB () (Only Int64)
 integersQuery = query $
@@ -113,14 +113,11 @@ spec = describe "Functions" $ do
         hs `shouldContain` "--   srf_any(anyelement): set-returning pseudotype return is not representable"
 
 runGenerator :: IO String
-runGenerator = withDbCache $ \cache -> do
-  result <- withConfig (cacheConfig cache) $ \db -> do
-    let connBS = toConnectionString db
-    sql <- BS8.readFile "./test/Functions/schemas/Public/structure.sql"
-    withConnection connBS $ define (UnsafeDefinition sql)
-    runSquealgenScript (BS8.unpack connBS) "FunctionsGenerated" "public"
-  case result of
-    Left err -> ioError (userError (displayException err))
+runGenerator = do
+  e <- try @SomeException $
+    runGeneratorFromSchema "./test/Functions/schemas/Public/structure.sql" "FunctionsGenerated" "public"
+  case e of
+    Left err  -> ioError (userError (displayException err))
     Right out -> pure out
 
 runSrfRuntimeChecks :: IO ([String], [String], [String])

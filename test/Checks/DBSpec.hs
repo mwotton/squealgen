@@ -2,11 +2,8 @@
 module Checks.DBSpec where
 
 import           Control.Exception      (SomeException, displayException, try)
-import qualified Data.ByteString.Char8  as BS8
 import           Checks.Public          ()
-import           Database.Postgres.Temp  (cacheConfig, withConfig, withDbCache, toConnectionString)
-import           DBHelpers              (runSquealgenScript)
-import           Squeal.PostgreSQL      (Definition (UnsafeDefinition), define, withConnection)
+import           DBHelpers              (runGeneratorFromSchema)
 import           Test.Hspec
 
 spec :: Spec
@@ -28,12 +25,9 @@ spec = describe "Checks" $ do
         hs `shouldContain` "domain public.positive_amount positive_amount_check: not representable in Domains typedef output (CHECK (VALUE > 0))"
 
 runGenerator :: IO String
-runGenerator = withDbCache $ \cache -> do
-  result <- withConfig (cacheConfig cache) $ \db -> do
-    let connBS = toConnectionString db
-    sql <- BS8.readFile "./test/Checks/schemas/Public/structure.sql"
-    withConnection connBS $ define (UnsafeDefinition sql)
-    runSquealgenScript (BS8.unpack connBS) "Checks.Generated" "public"
-  case result of
-    Left err -> ioError (userError (displayException err))
+runGenerator = do
+  e <- try @SomeException $
+    runGeneratorFromSchema "./test/Checks/schemas/Public/structure.sql" "Checks.Generated" "public"
+  case e of
+    Left err  -> ioError (userError (displayException err))
     Right out -> pure out

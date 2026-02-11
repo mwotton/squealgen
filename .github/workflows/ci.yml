@@ -44,3 +44,13 @@ jobs:
 
       - name: Test and enforce generated fixture parity
         run: make test
+
+      - name: Enforce source coverage policy
+        run: ./check_coverage.sh
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
