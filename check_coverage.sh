@@ -5,12 +5,22 @@ threshold="${COVERAGE_THRESHOLD:-100}"
 report_dir="${COVERAGE_REPORT_DIR:-coverage}"
 allowlist_file="${COVERAGE_ALLOWLIST_FILE:-coverage-allowlist.txt}"
 
+# Coverage artifacts are run-specific; stale .tix files can cause hash mismatches.
+rm -rf "$report_dir"
 mkdir -p "$report_dir"
 
 cabal build --enable-coverage test:tests
 test_bin="$(cabal list-bin test:tests)"
 latest_tix="$report_dir/tests.tix"
-HPCTIXFILE="$latest_tix" "$test_bin"
+test_run_log="$(mktemp "$report_dir/test-run.XXXXXX.log")"
+if ! HPCTIXFILE="$latest_tix" "$test_bin" >"$test_run_log" 2>&1; then
+  cat "$test_run_log" >&2
+  if grep -Fq "module mismatch with .tix/.mix file hash number" "$test_run_log"; then
+    echo "ERROR: coverage hash mismatch detected while running tests; stale HPC data is likely present. Re-running with a clean coverage directory is required." >&2
+  fi
+  exit 1
+fi
+rm -f "$test_run_log"
 
 mapfile -t modules < <(find src -type f -name '*.hs' -print | sed -E 's#^src/##; s#\.hs$##; s#/#.#g' | sort -u)
 if [[ "${#modules[@]}" -eq 0 ]]; then
@@ -68,7 +78,16 @@ for dir in "${hpcdirs[@]}"; do
   done < <(find "$dir" -mindepth 1 -maxdepth 1 -type d -print)
 done
 
-report_output="$(hpc report "$latest_tix" --hpcdir "$combined_hpcdir" "${included_modules[@]}")"
+hpc_report_log="$(mktemp "$report_dir/hpc-report.XXXXXX.log")"
+if ! hpc report "$latest_tix" --hpcdir "$combined_hpcdir" "${included_modules[@]}" >"$hpc_report_log" 2>&1; then
+  cat "$hpc_report_log" >&2
+  if grep -Fq "module mismatch with .tix/.mix file hash number" "$hpc_report_log"; then
+    echo "ERROR: coverage hash mismatch detected while reporting; .tix and .mix inputs are inconsistent." >&2
+  fi
+  exit 1
+fi
+report_output="$(cat "$hpc_report_log")"
+rm -f "$hpc_report_log"
 printf '%s\n' "$report_output" | tee "$report_dir/hpc-report.txt"
 
 coverage_percent="$(printf '%s\n' "$report_output" | sed -n -E 's/^[[:space:]]*([0-9]+(\.[0-9]+)?)% expressions used.*/\1/p' | head -n 1)"

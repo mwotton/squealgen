@@ -152,9 +152,13 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
 
   it "coverage gate removes stale tix before running tests" $ do
     repoRoot <- getCurrentDirectory
-    (exitCode, _, err, _) <- runCoverageScriptWithStaleTixGuard repoRoot
-    exitCode `shouldBe` ExitSuccess
-    err `shouldSatisfy` (not . isInfixOf "stale tix present")
+    (firstRun, secondRun) <- runCoverageScriptWithStaleTixGuard repoRoot
+    let (firstExit, _, firstErr, _) = firstRun
+        (secondExit, _, secondErr, _) = secondRun
+    firstExit `shouldBe` ExitSuccess
+    secondExit `shouldBe` ExitSuccess
+    firstErr `shouldSatisfy` (not . isInfixOf "stale tix present")
+    secondErr `shouldSatisfy` (not . isInfixOf "stale tix present")
 
   it "drift checker fails on SQL and mode drift, then passes after regeneration" $ do
     repoRoot <- getCurrentDirectory
@@ -267,7 +271,7 @@ runCoverageScriptWithFakeReport repoRoot fakeReportLine thresholdValue =
     summary <- if hasSummary then readFile summaryPath else pure ""
     pure (exitCode, out, err, summary)
 
-runCoverageScriptWithStaleTixGuard :: FilePath -> IO (ExitCode, String, String, String)
+runCoverageScriptWithStaleTixGuard :: FilePath -> IO ((ExitCode, String, String, String), (ExitCode, String, String, String))
 runCoverageScriptWithStaleTixGuard repoRoot =
   withSystemTempDirectory "coverage-stale-tix" $ \tmpDir -> do
     let coverageScript = tmpDir </> "check_coverage.sh"
@@ -328,10 +332,15 @@ runCoverageScriptWithStaleTixGuard repoRoot =
 
     env <- ((envVars ++) . overridePath fakeBin) <$> getEnvironment
     let cmd = (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_coverage.sh"]) { env = Just env }
-    (exitCode, out, err) <- readCreateProcessWithExitCode cmd ""
-    hasSummary <- doesFileExist summaryPath
-    summary <- if hasSummary then readFile summaryPath else pure ""
-    pure (exitCode, out, err, summary)
+    (firstExit, firstOut, firstErr) <- readCreateProcessWithExitCode cmd ""
+    firstHasSummary <- doesFileExist summaryPath
+    firstSummary <- if firstHasSummary then readFile summaryPath else pure ""
+
+    (secondExit, secondOut, secondErr) <- readCreateProcessWithExitCode cmd ""
+    secondHasSummary <- doesFileExist summaryPath
+    secondSummary <- if secondHasSummary then readFile summaryPath else pure ""
+
+    pure ((firstExit, firstOut, firstErr, firstSummary), (secondExit, secondOut, secondErr, secondSummary))
 
 runInRepo :: FilePath -> String -> IO ()
 runInRepo dir command = do
