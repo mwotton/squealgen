@@ -4,12 +4,18 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Functions.DBSpec where
 
+import           Control.Exception        (SomeException, displayException, try)
+import qualified Data.ByteString.Char8    as BS8
 import           Data.Int
+import           Database.Postgres.Temp   (cacheConfig, withConfig, withDbCache, toConnectionString)
 import           DBHelpers         (runSession)
 import           Functions.Public
 import qualified Generics.SOP      as SOP
 import qualified GHC.Generics      as GHC
 import           Squeal.PostgreSQL
+import           System.Exit              (ExitCode (..))
+import qualified System.IO                as IO
+import           System.Process           (proc, readCreateProcessWithExitCode)
 import           Test.Hspec
 
 -- interesting to note that we are collecting the raw int names, like int4 and int8.
@@ -50,3 +56,38 @@ spec = describe "Functions" $ do
       `shouldReturn` ([Only (Just 25)]
                      ,[Only (Just 2)]
                      ,[Only (Just "foo")])
+  it "generates overloaded and zero-arg functions" $ do
+    e <- try @SomeException runGenerator :: IO (Either SomeException String)
+    case e of
+      Left err -> expectationFailure ("setup failed: " <> displayException err)
+      Right hs -> do
+        hs `shouldContain` "\"overloaded__int4\" ::: Function ('[ Null PGint4 ] :=> 'Returns ( 'Null PGint4) )"
+        hs `shouldContain` "\"overloaded__int8\" ::: Function ('[ Null PGint8 ] :=> 'Returns ( 'Null PGint8) )"
+        hs `shouldContain` "\"zero_arg\" ::: Function ('[  ] :=> 'Returns ( 'Null PGint8) )"
+
+runGenerator :: IO String
+runGenerator = withDbCache $ \cache -> do
+  result <- withConfig (cacheConfig cache) $ \db -> do
+    let connBS = toConnectionString db
+    sql <- BS8.readFile "./test/Functions/schemas/Public/structure.sql"
+    withConnection connBS $ define (UnsafeDefinition sql)
+    runSquealgen (BS8.unpack connBS) "FunctionsGenerated" "public"
+  case result of
+    Left err -> ioError (userError (displayException err))
+    Right out -> pure out
+
+runSquealgen :: String -> String -> String -> IO String
+runSquealgen conn moduleName' chosen = do
+  script <- IO.readFile "squealgen.sql"
+  let cmd = proc "psql"
+        [ "-X"
+        , "-q"
+        , "-v", "chosen_schema=" <> chosen
+        , "-v", "modulename=" <> moduleName'
+        , "-v", "extra_imports="
+        , "-d", conn
+        ]
+  (exitCode, out, err) <- readCreateProcessWithExitCode cmd script
+  case exitCode of
+    ExitSuccess   -> pure out
+    ExitFailure c -> ioError (userError (unlines ["psql exited with code " <> show c, err]))
