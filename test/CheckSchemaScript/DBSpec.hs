@@ -111,7 +111,7 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
 
       writeFile sqlFile "select 2;\n"
       (driftExit, _, driftErr) <- readCreateProcessWithExitCode makeTestCmd ""
-      driftExit `shouldBe` ExitFailure 2
+      driftExit `shouldSatisfy` (/= ExitSuccess)
       driftErr `shouldSatisfy` ("squealgen drift detected" `isInfixOf`)
       driftErr `shouldSatisfy` ("./mksquealgen.sh" `isInfixOf`)
 
@@ -121,7 +121,8 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
 
   it "workflow tests do not depend on make-specific exit-code numerics" $ do
     source <- readFile "test/CheckSchemaScript/DBSpec.hs"
-    source `shouldSatisfy` (not . isInfixOf "driftExit `shouldBe` ExitFailure 2")
+    let forbidden = "driftExit `shouldBe` ExitFailure " <> "2"
+    source `shouldSatisfy` (not . isInfixOf forbidden)
 
   it "make ci target chains local validation and coverage gate" $ do
     makefile <- readFile "Makefile"
