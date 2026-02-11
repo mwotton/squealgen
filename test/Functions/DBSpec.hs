@@ -7,6 +7,7 @@ module Functions.DBSpec where
 import           Control.Exception        (SomeException, displayException, try)
 import qualified Data.ByteString.Char8    as BS8
 import           Data.Int
+import           Data.List               (sort)
 import           Database.Postgres.Temp   (cacheConfig, withConfig, withDbCache, toConnectionString)
 import           DBHelpers         (runSession)
 import           Functions.Public
@@ -45,6 +46,25 @@ manyParamsQuery :: Statement DB (Int64, Float, String) (Only (Maybe String))
 manyParamsQuery = query $
   values_ ((functionN #many_params) (param @1 :* param @2 *: param @3) `as` #fromOnly)
 
+outOnlyQuery :: Statement DB () (Only (Maybe Int64))
+outOnlyQuery = query $
+  values_ ((functionN #out_only) Nil `as` #fromOnly)
+
+inoutOnlyQuery :: Statement DB () (Only (Maybe Int64))
+inoutOnlyQuery = query $
+  values_ ((function #inout_only) (3 & notNull) `as` #fromOnly)
+
+mixedInInoutQuery :: Statement DB () (Only (Maybe Int64))
+mixedInInoutQuery = query $
+  values_ ((functionN #mixed_in_inout) ((4 & notNull) *: (6 & notNull)) `as` #fromOnly)
+
+procIncrement :: Statement DB () ()
+procIncrement = manipulation $ call #proc_increment (5 & notNull)
+
+integersQuery :: Statement DB () (Only Int64)
+integersQuery = query $
+  select_ (#integers ! #num `as` #fromOnly) (from (table #integers))
+
 spec = describe "Functions" $ do
   it "doubles things" $ do
     runSession "Functions" "Public"
@@ -56,6 +76,19 @@ spec = describe "Functions" $ do
       `shouldReturn` ([Only (Just 25)]
                      ,[Only (Just 2)]
                      ,[Only (Just "foo")])
+  it "supports representable IN/OUT/INOUT signatures and procedures" $ do
+    runSession "Functions" "Public"
+      (do
+        _ <- execute procIncrement
+        (,,,)
+          <$> (getRows =<< execute outOnlyQuery)
+          <*> (getRows =<< execute inoutOnlyQuery)
+          <*> (getRows =<< execute mixedInInoutQuery)
+          <*> (sort <$> (getRows =<< execute integersQuery)))
+      `shouldReturn` ([Only (Just 99)]
+                     ,[Only (Just 13)]
+                     ,[Only (Just 10)]
+                     ,[Only 1, Only 5])
   it "generates overloaded and zero-arg functions" $ do
     e <- try @SomeException runGenerator :: IO (Either SomeException String)
     case e of

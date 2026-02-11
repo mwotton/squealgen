@@ -39,7 +39,8 @@ type Tables = ('[
    "integers" ::: 'Table IntegersTable]  :: [(Symbol,SchemumType)])
 
 -- defs
-type IntegersColumns = '["num" ::: 'NoDef :=> 'NotNull PGint8]
+type IntegersColumns = '["oid" ::: 'NoDef :=> 'NotNull PGoid
+  ,"num" ::: 'NoDef :=> 'NotNull PGint8]
 type IntegersConstraints = '[]
 type IntegersTable = IntegersConstraints :=> IntegersColumns
 
@@ -47,12 +48,20 @@ type IntegersTable = IntegersConstraints :=> IntegersColumns
 type Views = 
   '[]
 
-
 -- functions
 type Functions = 
   '[ "doubler" ::: Function ('[ Null PGint8 ] :=> 'Returns ( 'Null PGint8) )
+   , "inout_only" ::: Function ('[ Null PGint8 ] :=> 'Returns ( 'Null PGint8) )
    , "many_params" ::: Function ('[ NotNull PGint8,  NotNull PGfloat4,  NotNull PGtext ] :=> 'Returns ( 'Null PGtext) )
+   , "mixed_in_inout" ::: Function ('[ Null PGint8,  Null PGint8 ] :=> 'Returns ( 'Null PGint8) )
+   , "out_only" ::: Function ('[  ] :=> 'Returns ( 'Null PGint8) )
+   , "overloaded__int4" ::: Function ('[ Null PGint4 ] :=> 'Returns ( 'Null PGint4) )
+   , "overloaded__int8" ::: Function ('[ Null PGint8 ] :=> 'Returns ( 'Null PGint8) )
+   , "proc_increment" ::: 'Procedure '[ Null PGint8 ]
    , "somefunc" ::: Function ('[ Null PGint4,  Null PGint8 ] :=> 'Returns ( 'Null PGint8) )
-   , "strict_doubler" ::: Function ('[ NotNull PGint8 ] :=> 'Returns ( 'Null PGint8) ) ]
+   , "strict_doubler" ::: Function ('[ NotNull PGint8 ] :=> 'Returns ( 'Null PGint8) )
+   , "zero_arg" ::: Function ('[  ] :=> 'Returns ( 'Null PGint8) ) ]
+-- Omitted function signatures:
+--   inout_params(int8): pseudotype return is not representable
 type Domains = '[]
 

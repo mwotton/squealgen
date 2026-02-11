@@ -425,6 +425,7 @@ with function_meta as (
          p.proname,
          p.proisstrict,
          p.prokind,
+         p.proretset,
          p.proargtypes,
          p.proargmodes,
          ret.typname as ret_type,
@@ -458,16 +459,15 @@ with function_meta as (
 ), function_classified as (
   select fm.oid,
          fm.proname,
+         fm.prokind,
          fm.ret_type,
          fm.ret_category,
          count(*) over (partition by fm.proname) as overload_count,
          coalesce(fa.arg_decls, '') as arg_decls,
          coalesce(fa.arg_tokens, '') as arg_tokens,
          case
-           when fm.prokind = 'p' then 'procedures are not yet representable'
-           when coalesce(array_to_string(fm.proargmodes, ''), '') ~ '[obt]'
-             then 'OUT/INOUT/TABLE parameters are not yet representable'
-           when fm.ret_typtype = 'p' then 'pseudotype return is not representable'
+           when fm.proretset then 'set-returning signatures are not yet representable'
+           when fm.prokind <> 'p' and fm.ret_typtype = 'p' then 'pseudotype return is not representable'
            when not coalesce(fa.args_representable, true) then 'pseudotype argument is not representable'
            else null
          end as omission_reason
@@ -476,6 +476,7 @@ with function_meta as (
       on fa.oid = fm.oid
 )
 select proname,
+       prokind,
        arg_decls,
        arg_tokens,
        ret_type,
@@ -490,11 +491,16 @@ select proname,
 
 select format(E'type Functions = \n  ''[ %s ]'
      , coalesce(string_agg(
-         format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null %s) )',
-           funcs.label,
-           funcs.arg_decls,
-           pg_temp.type_decl_from(funcs.ret_category, funcs.ret_type, null, false, null)
-         ),
+         case
+           when funcs.prokind = 'p'
+             then format(E'"%s" ::: ''Procedure ''[ %s ]',
+                         funcs.label,
+                         funcs.arg_decls)
+           else format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null %s) )',
+                       funcs.label,
+                       funcs.arg_decls,
+                       pg_temp.type_decl_from(funcs.ret_category, funcs.ret_type, null, false, null))
+         end,
          E'\n   , ' order by (funcs.label :: text) COLLATE "C"), '')
        ) as functions
 from my_functions funcs
