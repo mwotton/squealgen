@@ -22,6 +22,7 @@ import qualified ForeignKeyReferencedColumns.DBSpec
 import qualified Property.DDLSpec
 import qualified Views.DBSpec
 import qualified PgCatalog.DBSpec
+import qualified Triggers.DBSpec
 
 main :: IO ()
 main = do
@@ -44,5 +45,6 @@ main = do
     , testSpec "ForeignKeyReferencedColumns.DB" ForeignKeyReferencedColumns.DBSpec.spec
     , testSpec "Views.DB" Views.DBSpec.spec
     , testSpec "PgCatalog.DB" PgCatalog.DBSpec.spec
+    , testSpec "Triggers.DB" Triggers.DBSpec.spec
     ]
   defaultMain $ testGroup "tests" (hspecTrees ++ [Property.DDLSpec.testTree])

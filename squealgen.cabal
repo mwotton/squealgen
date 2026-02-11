@@ -77,6 +77,8 @@ test-suite tests
       NoConstraints.Public
       PgCatalog.DBSpec
       Property.DDLSpec
+      Triggers.DBSpec
+      Triggers.Public
       Views.DBSpec
       Views.Public
       Paths_squealgen
