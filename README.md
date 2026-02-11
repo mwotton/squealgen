@@ -47,6 +47,12 @@ Validation contract:
 - Local validation (`make test`): enforce `squealgen` drift parity and run the Haskell test suite.
 - CI validation (`make ci`): run `make test` plus `./check_coverage.sh` coverage policy gate.
 
+Function-overload compatibility notes:
+
+- Generated output always includes deterministic disambiguated overloaded labels (`name__argtokens`).
+- When an overloaded base name has exactly one representable signature after filtering, a compatibility alias using the legacy simple name (`name`) is also emitted.
+- When two or more representable overloads remain, no legacy alias is emitted and generated output includes an explicit ambiguity note.
+
 you'll need
 
 - `initdb` from postgresql to be in your PATH. It typically isn't on Ubuntu systems, at least: usually in /usr/lib/postgresql/$VERSION_NUMBER/bin.

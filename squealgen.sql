@@ -555,6 +555,15 @@ with function_meta as (
       on fo.oid = fm.oid
     left join function_srf_composite_cols fc
       on fc.oid = fm.oid
+), function_labeled as (
+  select funcs.*,
+         count(*) filter (where funcs.omission_reason is null) over (partition by funcs.proname) as representable_overload_count,
+         case
+           when funcs.overload_count > 1
+             then funcs.proname || '__' || coalesce(nullif(funcs.arg_tokens, ''), 'noargs')
+           else funcs.proname
+         end as disambiguated_label
+    from function_classified funcs
 )
 select proname,
        prokind,
@@ -566,35 +575,79 @@ select proname,
        is_srf,
        srf_row_decls,
        omission_reason,
+       disambiguated_label as label,
        case
          when overload_count > 1
-           then proname || '__' || coalesce(nullif(arg_tokens, ''), 'noargs')
-         else proname
-       end as label
-  from function_classified;
+              and omission_reason is null
+              and representable_overload_count = 1
+           then proname
+         else null
+       end as compatibility_alias
+  from function_labeled;
 
 select format(E'type Functions = \n  ''[ %s ]'
      , coalesce(string_agg(
          case
-           when funcs.prokind = 'p'
+           when entries.prokind = 'p'
              then format(E'"%s" ::: ''Procedure ''[ %s ]',
-                         funcs.label,
-                         funcs.arg_decls)
-           when funcs.is_srf
+                         entries.label,
+                         entries.arg_decls)
+           when entries.is_srf
              then format(E'"%s" ::: Function (''[ %s ] :=> ''ReturnsTable ''[%s])',
-                         funcs.label,
-                         funcs.arg_decls,
-                         funcs.srf_row_decls)
+                         entries.label,
+                         entries.arg_decls,
+                         entries.srf_row_decls)
            else format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null %s) )',
-                       funcs.label,
-                       funcs.arg_decls,
-                       pg_temp.type_decl_from(funcs.ret_category, funcs.ret_type, null, false, null))
+                       entries.label,
+                       entries.arg_decls,
+                       pg_temp.type_decl_from(entries.ret_category, entries.ret_type, null, false, null))
          end,
-         E'\n   , ' order by (funcs.label :: text) COLLATE "C"), '')
+         E'\n   , ' order by (entries.label :: text) COLLATE "C"), '')
        ) as functions
-from my_functions funcs
-where funcs.omission_reason is null \gset
+from (
+  select funcs.label,
+         funcs.prokind,
+         funcs.is_srf,
+         funcs.arg_decls,
+         funcs.srf_row_decls,
+         funcs.ret_category,
+         funcs.ret_type
+    from my_functions funcs
+   where funcs.omission_reason is null
+  union all
+  select funcs.compatibility_alias as label,
+         funcs.prokind,
+         funcs.is_srf,
+         funcs.arg_decls,
+         funcs.srf_row_decls,
+         funcs.ret_category,
+         funcs.ret_type
+    from my_functions funcs
+   where funcs.omission_reason is null
+     and funcs.compatibility_alias is not null
+) entries \gset
 \echo :functions
+
+select case
+         when count(*) = 0 then '-- Overload compatibility aliases not emitted: none'
+         else E'-- Overload compatibility aliases not emitted:\n'
+              || string_agg(
+                   format(E'--   %s: ambiguous representable overloads (%s)',
+                     amb.proname,
+                     amb.arg_tokens_list),
+                   E'\n' order by (amb.proname :: text) COLLATE "C")
+       end as omitted_overload_compat_aliases
+  from (
+    select funcs.proname,
+           string_agg(
+             coalesce(nullif(replace(funcs.arg_tokens, '__', ', '), ''), 'noargs'),
+             ', ' order by (funcs.arg_tokens :: text) COLLATE "C") as arg_tokens_list
+      from my_functions funcs
+     where funcs.omission_reason is null
+     group by funcs.proname
+    having count(*) > 1
+  ) amb \gset
+\echo :omitted_overload_compat_aliases
 
 select case
          when count(*) = 0 then '-- Omitted function signatures: none'
