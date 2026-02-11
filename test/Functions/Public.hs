@@ -30,9 +30,9 @@ type Schema = Join Tables (Join Views (Join Enums (Join Functions (Join Composit
 -- decls
 type Enums =
   ('[] :: [(Symbol,SchemumType)])
-
+type PGscore_row = 'PGcomposite '["num" ::: 'NotNull PGint8, "label" ::: 'NotNull PGtext]
 type Composites =
-  ('[] :: [(Symbol,SchemumType)])
+  ('["score_row" ::: 'Typedef PGscore_row] :: [(Symbol,SchemumType)])
 
 -- schema
 type Tables = ('[
@@ -59,9 +59,14 @@ type Functions =
    , "overloaded__int8" ::: Function ('[ Null PGint8 ] :=> 'Returns ( 'Null PGint8) )
    , "proc_increment" ::: 'Procedure '[ Null PGint8 ]
    , "somefunc" ::: Function ('[ Null PGint4,  Null PGint8 ] :=> 'Returns ( 'Null PGint8) )
+   , "srf_composite" ::: Function ('[  ] :=> 'ReturnsTable '["num" ::: 'Null PGint8,"label" ::: 'Null PGtext])
+   , "srf_scalar" ::: Function ('[ Null PGint8 ] :=> 'ReturnsTable '["result" ::: 'Null PGint8])
+   , "srf_table" ::: Function ('[ Null PGint8 ] :=> 'ReturnsTable '["out_num" ::: 'Null PGint8,"out_text" ::: 'Null PGtext])
    , "strict_doubler" ::: Function ('[ NotNull PGint8 ] :=> 'Returns ( 'Null PGint8) )
    , "zero_arg" ::: Function ('[  ] :=> 'Returns ( 'Null PGint8) ) ]
 -- Omitted function signatures:
 --   inout_params(int8): pseudotype return is not representable
+-- Omitted SRF signatures:
+--   srf_any(anyelement): set-returning pseudotype return is not representable
 type Domains = '[]
 

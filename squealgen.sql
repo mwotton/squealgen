@@ -420,9 +420,12 @@ with function_meta as (
          p.proretset,
          p.proargtypes,
          p.proargmodes,
+         p.proallargtypes,
+         p.proargnames,
          ret.typname as ret_type,
          ret.typcategory as ret_category,
-         ret.typtype as ret_typtype
+         ret.typtype as ret_typtype,
+         ret.typrelid as ret_typrelid
     from pg_catalog.pg_proc p
     join pg_catalog.pg_namespace ns
       on ns.oid = p.pronamespace
@@ -448,31 +451,95 @@ with function_meta as (
     left join pg_catalog.pg_type type_arg
       on type_arg.oid = args.arg_oid
    group by fm.oid
+), function_srf_outcols as (
+  select fm.oid,
+         string_agg(
+           format('"%s" ::: ''Null %s',
+             coalesce((fm.proargnames)[idx.pos], format('column_%s', idx.pos)),
+             pg_temp.type_decl_from(arg_type.typcategory, arg_type.typname, null, false, null)),
+           ',' order by idx.pos
+         ) as row_decls,
+         bool_and(arg_type.typtype <> 'p') as row_representable
+    from function_meta fm
+    join lateral generate_subscripts(coalesce(fm.proallargtypes, array[]::oid[]), 1) as idx(pos)
+      on true
+    join pg_catalog.pg_type arg_type
+      on arg_type.oid = (fm.proallargtypes)[idx.pos]
+   where coalesce((fm.proargmodes)[idx.pos]::text, 'i') in ('o', 't', 'b')
+   group by fm.oid
+), function_srf_composite_cols as (
+  select fm.oid,
+         string_agg(
+           format('"%s" ::: ''Null %s',
+             a.attname,
+             pg_temp.type_decl_from(att_t.typcategory, att_t.typname, null, false, null)),
+           ',' order by a.attnum
+         ) as row_decls,
+         bool_and(att_t.typtype <> 'p') as row_representable
+    from function_meta fm
+    join pg_catalog.pg_attribute a
+      on a.attrelid = fm.ret_typrelid
+     and a.attnum > 0
+     and not a.attisdropped
+    join pg_catalog.pg_type att_t
+      on att_t.oid = a.atttypid
+   where fm.proretset
+     and fm.ret_typtype = 'c'
+   group by fm.oid
 ), function_classified as (
   select fm.oid,
          fm.proname,
          fm.prokind,
+         fm.proretset,
          fm.ret_type,
          fm.ret_category,
          count(*) over (partition by fm.proname) as overload_count,
          coalesce(fa.arg_decls, '') as arg_decls,
          coalesce(fa.arg_tokens, '') as arg_tokens,
+         (fm.proretset and coalesce(fo.row_decls, fc.row_decls) is not null)
+           or (fm.proretset and fm.ret_typtype <> 'p' and fm.ret_typtype <> 'c') as is_srf,
          case
-           when fm.proretset then 'set-returning signatures are not yet representable'
-           when fm.prokind <> 'p' and fm.ret_typtype = 'p' then 'pseudotype return is not representable'
+           when fm.proretset and fo.row_decls is not null then fo.row_decls
+           when fm.proretset and fm.ret_typtype = 'c' then fc.row_decls
+           when fm.proretset then format('"result" ::: ''Null %s',
+                               pg_temp.type_decl_from(fm.ret_category, fm.ret_type, null, false, null))
+           else null
+         end as srf_row_decls,
+         case
+           when fm.proretset and fo.row_decls is not null then coalesce(fo.row_representable, true)
+           when fm.proretset and fm.ret_typtype = 'c' then coalesce(fc.row_representable, false)
+           when fm.proretset then fm.ret_typtype <> 'p'
+           else true
+         end as srf_representable,
+         case
+           when fm.proretset and (
+             case
+               when fo.row_decls is not null then not coalesce(fo.row_representable, true)
+               when fm.ret_typtype = 'c' then not coalesce(fc.row_representable, false)
+               else fm.ret_typtype = 'p'
+             end
+           ) then 'set-returning pseudotype return is not representable'
            when not coalesce(fa.args_representable, true) then 'pseudotype argument is not representable'
+           when not fm.proretset and fm.prokind <> 'p' and fm.ret_typtype = 'p' then 'pseudotype return is not representable'
            else null
          end as omission_reason
     from function_meta fm
     left join function_args fa
       on fa.oid = fm.oid
+    left join function_srf_outcols fo
+      on fo.oid = fm.oid
+    left join function_srf_composite_cols fc
+      on fc.oid = fm.oid
 )
 select proname,
        prokind,
+       proretset,
        arg_decls,
        arg_tokens,
        ret_type,
        ret_category,
+       is_srf,
+       srf_row_decls,
        omission_reason,
        case
          when overload_count > 1
@@ -488,6 +555,11 @@ select format(E'type Functions = \n  ''[ %s ]'
              then format(E'"%s" ::: ''Procedure ''[ %s ]',
                          funcs.label,
                          funcs.arg_decls)
+           when funcs.is_srf
+             then format(E'"%s" ::: Function (''[ %s ] :=> ''ReturnsTable ''[%s])',
+                         funcs.label,
+                         funcs.arg_decls,
+                         funcs.srf_row_decls)
            else format(E'"%s" ::: Function (''[ %s ] :=> ''Returns ( ''Null %s) )',
                        funcs.label,
                        funcs.arg_decls,
@@ -511,8 +583,25 @@ select case
                                  (funcs.arg_tokens :: text) COLLATE "C")
        end as omitted_function_signatures
   from my_functions funcs
- where funcs.omission_reason is not null \gset
+ where funcs.omission_reason is not null
+   and not funcs.proretset \gset
 \echo :omitted_function_signatures
+
+select case
+         when count(*) = 0 then '-- Omitted SRF signatures: none'
+         else E'-- Omitted SRF signatures:\n'
+              || string_agg(
+                   format(E'--   %s(%s): %s',
+                     funcs.proname,
+                     coalesce(nullif(replace(funcs.arg_tokens, '__', ', '), ''), 'noargs'),
+                     funcs.omission_reason),
+                   E'\n' order by (funcs.proname :: text) COLLATE "C",
+                                 (funcs.arg_tokens :: text) COLLATE "C")
+       end as omitted_srf_signatures
+  from my_functions funcs
+ where funcs.omission_reason is not null
+   and funcs.proretset \gset
+\echo :omitted_srf_signatures
 
 SELECT format('type Domains = ''[%s]',
 	 coalesce(string_agg(format(E'"%s" ::: ''Typedef PG%s',

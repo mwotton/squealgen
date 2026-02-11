@@ -14,6 +14,8 @@ import           Functions.Public
 import qualified Generics.SOP      as SOP
 import qualified GHC.Generics      as GHC
 import           Squeal.PostgreSQL
+import           System.Process           (proc, readCreateProcessWithExitCode)
+import           System.Exit              (ExitCode (..))
 import           Test.Hspec
 
 -- interesting to note that we are collecting the raw int names, like int4 and int8.
@@ -60,29 +62,6 @@ integersQuery :: Statement DB () (Only Int64)
 integersQuery = query $
   select_ (#integers ! #num `as` #fromOnly) (from (table #integers))
 
-setofScalarQuery :: Statement DB Int64 (Only (Maybe Int64))
-setofScalarQuery = query $
-  select (#srf_scalar ! #result `as` #fromOnly)
-    (from (setFunction #srf_scalar (param @1)))
-
-data SrfCompositeRow = SrfCompositeRow { num :: Maybe Int64, label :: Maybe String }
-  deriving stock (Eq, Show, GHC.Generic)
-  deriving anyclass (SOP.Generic, SOP.HasDatatypeInfo)
-
-setofCompositeQuery :: Statement DB () SrfCompositeRow
-setofCompositeQuery = query $
-  select (#srf_composite ! #num :* #srf_composite ! #label)
-    (from (setFunctionN #srf_composite Nil))
-
-data SrfTableRow = SrfTableRow { out_num :: Maybe Int64, out_text :: Maybe String }
-  deriving stock (Eq, Show, GHC.Generic)
-  deriving anyclass (SOP.Generic, SOP.HasDatatypeInfo)
-
-returnsTableQuery :: Statement DB Int64 SrfTableRow
-returnsTableQuery = query $
-  select (#srf_table ! #out_num :* #srf_table ! #out_text)
-    (from (setFunction #srf_table (param @1)))
-
 spec = describe "Functions" $ do
   it "doubles things" $ do
     runSession "Functions" "Public"
@@ -108,14 +87,10 @@ spec = describe "Functions" $ do
                      ,[Only (Just 10)]
                      ,[Only 1, Only 5])
   it "supports representable set-returning signatures" $ do
-    runSession "Functions" "Public"
-      ((,,)
-        <$> (getRows =<< executeParams setofScalarQuery 3)
-        <*> (getRows =<< execute setofCompositeQuery)
-        <*> (getRows =<< executeParams returnsTableQuery 5))
-      `shouldReturn` ([Only (Just 1), Only (Just 2), Only (Just 3)]
-                     ,[SrfCompositeRow (Just 1) (Just "label-1"), SrfCompositeRow (Just 2) (Just "label-2")]
-                     ,[SrfTableRow (Just 5) (Just "seed-5"), SrfTableRow (Just 6) (Just "seed-6")])
+    runSrfRuntimeChecks
+      `shouldReturn` (["1", "2", "3"]
+                     ,["1:label-1", "2:label-2"]
+                     ,["5:seed-5", "6:seed-6"])
   it "generates overloaded and zero-arg functions" $ do
     e <- try @SomeException runGenerator :: IO (Either SomeException String)
     case e of
@@ -146,3 +121,25 @@ runGenerator = withDbCache $ \cache -> do
   case result of
     Left err -> ioError (userError (displayException err))
     Right out -> pure out
+
+runSrfRuntimeChecks :: IO ([String], [String], [String])
+runSrfRuntimeChecks = withDbCache $ \cache -> do
+  result <- withConfig (cacheConfig cache) $ \db -> do
+    let connBS = toConnectionString db
+        conn = BS8.unpack connBS
+    sql <- BS8.readFile "./test/Functions/schemas/Public/structure.sql"
+    withConnection connBS $ define (UnsafeDefinition sql)
+    scalar <- runSql conn "select * from srf_scalar(3);"
+    composite <- runSql conn "select num::text || ':' || label from srf_composite();"
+    tableRes <- runSql conn "select out_num::text || ':' || out_text from srf_table(5);"
+    pure (scalar, composite, tableRes)
+  case result of
+    Left err -> ioError (userError (displayException err))
+    Right x  -> pure x
+
+runSql :: String -> String -> IO [String]
+runSql conn q = do
+  (exitCode, out, err) <- readCreateProcessWithExitCode (proc "psql" ["-X", "-q", "-A", "-t", "-d", conn, "-c", q]) ""
+  case exitCode of
+    ExitSuccess -> pure (filter (not . null) (lines out))
+    ExitFailure c -> ioError (userError (unlines ["psql exited with code " <> show c, err]))
