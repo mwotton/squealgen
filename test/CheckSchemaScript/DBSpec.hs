@@ -119,6 +119,12 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
     makefile <- readFile "Makefile"
     makefile `shouldSatisfy` ("check-squealgen-drift" `isInfixOf`)
 
+  it "make ci target chains local validation and coverage gate" $ do
+    makefile <- readFile "Makefile"
+    makefile `shouldSatisfy` (".PHONY: ci" `isInfixOf`)
+    makefile `shouldSatisfy` ("ci: test" `isInfixOf`)
+    makefile `shouldSatisfy` ("./check_coverage.sh" `isInfixOf`)
+
   it "CI invokes canonical make test gate" $ do
     workflow <- readFile ".github/workflows/ci.yml"
     workflow `shouldSatisfy` ("run: make test" `isInfixOf`)
