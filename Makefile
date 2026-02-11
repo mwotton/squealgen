@@ -6,8 +6,12 @@ squealgen: squealgen.sql mksquealgen.sh
 install: squealgen
 	install squealgen $(prefix)/bin/squealgen
 
+.PHONY: check-squealgen-drift
+check-squealgen-drift: squealgen.sql mksquealgen.sh
+	./check_squealgen_drift.sh
+
 .PHONY: test
-test: squealgen $(testTargets)
+test: check-squealgen-drift squealgen $(testTargets)
 	@echo "testtargets: " $(testTargets)
 	cabal test --test-show-details=direct --ghc-option=-fprint-potential-instances
 

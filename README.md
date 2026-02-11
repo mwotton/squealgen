@@ -34,6 +34,10 @@ My workflow looks like this:
 
 ```make testwatch```
 
+`squealgen` is generated from `squealgen.sql` via `./mksquealgen.sh`.
+Treat `squealgen.sql` as the source of truth and do not edit `squealgen` directly.
+`./check_squealgen_drift.sh` is run by `make test` and CI to enforce this.
+
 you'll need
 
 - `initdb` from postgresql to be in your PATH. It typically isn't on Ubuntu systems, at least: usually in /usr/lib/postgresql/$VERSION_NUMBER/bin.
