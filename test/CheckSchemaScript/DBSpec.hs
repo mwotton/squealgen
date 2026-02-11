@@ -171,6 +171,33 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
     firstErr `shouldSatisfy` (not . isInfixOf "stale tix present")
     secondErr `shouldSatisfy` (not . isInfixOf "stale tix present")
 
+  it "coverage gate applies line-level exclusions from allowlist selectors" $ do
+    repoRoot <- getCurrentDirectory
+    let allowlist = "Foo:2|exclude known unreachable guard\n"
+        fakeShow = unlines
+          [ "0 1 pkg:Foo 1:1-1:5 ExpBox False"
+          , "1 0 pkg:Foo 2:1-2:5 ExpBox False"
+          ]
+    (exitCode, out, _, summary) <- runCoverageScriptWithAllowlist repoRoot "50% expressions used (1/2)" "60" allowlist fakeShow
+    exitCode `shouldBe` ExitSuccess
+    out `shouldSatisfy` ("Applied line-level exclusions: 1 expressions removed" `isInfixOf`)
+    summary `shouldSatisfy` ("line_exclusions_applied=1" `isInfixOf`)
+    summary `shouldSatisfy` ("expressions_total=1" `isInfixOf`)
+
+  it "coverage gate rejects malformed line-level allowlist selectors" $ do
+    repoRoot <- getCurrentDirectory
+    let allowlist = "Foo:abc|bad selector\n"
+    (exitCode, _, err, _) <- runCoverageScriptWithAllowlist repoRoot "90% expressions used (9/10)" "80" allowlist ""
+    exitCode `shouldBe` ExitFailure 1
+    err `shouldSatisfy` ("invalid allowlist selector" `isInfixOf`)
+
+  it "coverage gate requires rationale for each allowlist selector" $ do
+    repoRoot <- getCurrentDirectory
+    let allowlist = "Foo:2|\n"
+    (exitCode, _, err, _) <- runCoverageScriptWithAllowlist repoRoot "90% expressions used (9/10)" "80" allowlist ""
+    exitCode `shouldBe` ExitFailure 1
+    err `shouldSatisfy` ("missing rationale" `isInfixOf`)
+
   it "drift checker fails on SQL and mode drift, then passes after regeneration" $ do
     repoRoot <- getCurrentDirectory
     withSystemTempDirectory "squealgen-drift-check" $ \tmpDir -> do
@@ -255,6 +282,10 @@ overridePath fakeBin env = ("PATH", fakeBin <> ":" <> currentPath) : filter ((/=
 
 runCoverageScriptWithFakeReport :: FilePath -> String -> String -> IO (ExitCode, String, String, String)
 runCoverageScriptWithFakeReport repoRoot fakeReportLine thresholdValue =
+  runCoverageScriptWithAllowlist repoRoot fakeReportLine thresholdValue "" ""
+
+runCoverageScriptWithAllowlist :: FilePath -> String -> String -> String -> String -> IO (ExitCode, String, String, String)
+runCoverageScriptWithAllowlist repoRoot fakeReportLine thresholdValue allowlistContents fakeShowOutput =
   withSystemTempDirectory "coverage-gate" $ \tmpDir -> do
     let coverageScript = tmpDir </> "check_coverage.sh"
         fakeBin = tmpDir </> "bin"
@@ -263,10 +294,13 @@ runCoverageScriptWithFakeReport repoRoot fakeReportLine thresholdValue =
         fakeTestBin = tmpDir </> "fake-tests-bin"
         srcDir = tmpDir </> "src"
         mixPkgDir = tmpDir </> "dist-newstyle" </> "build" </> "x" </> "hpc" </> "mix" </> "pkg"
+        allowlistPath = tmpDir </> "coverage-allowlist.txt"
         envVars =
           [ ("FAKE_TEST_BIN", fakeTestBin)
           , ("FAKE_HPC_REPORT_LINE", fakeReportLine)
+          , ("FAKE_HPC_SHOW_OUTPUT", fakeShowOutput)
           , ("COVERAGE_THRESHOLD", thresholdValue)
+          , ("COVERAGE_ALLOWLIST_FILE", allowlistPath)
           ]
         summaryPath = tmpDir </> "coverage" </> "summary.txt"
     copyFile (repoRoot </> "check_coverage.sh") coverageScript
@@ -275,6 +309,7 @@ runCoverageScriptWithFakeReport repoRoot fakeReportLine thresholdValue =
     createDirectoryIfMissing True srcDir
     createDirectoryIfMissing True mixPkgDir
     writeFile (srcDir </> "Foo.hs") "module Foo where\nfoo :: Int\nfoo = 1\n"
+    writeFile allowlistPath allowlistContents
     writeFile fakeTestBin "#!/usr/bin/env bash\nset -euo pipefail\n: \"${HPCTIXFILE:?missing HPCTIXFILE}\"\ntouch \"$HPCTIXFILE\"\n"
     makeExecutable fakeTestBin
     writeFile fakeCabal $ unlines
@@ -292,11 +327,18 @@ runCoverageScriptWithFakeReport repoRoot fakeReportLine thresholdValue =
     writeFile fakeHpc $ unlines
       [ "#!/usr/bin/env bash"
       , "set -euo pipefail"
-      , "if [[ \"$1\" != \"report\" ]]; then"
-      , "  echo \"unexpected hpc args: $*\" >&2"
-      , "  exit 1"
-      , "fi"
-      , "printf '%s\\n' \"$FAKE_HPC_REPORT_LINE\""
+      , "case \"$1\" in"
+      , "  report)"
+      , "    printf '%s\\n' \"$FAKE_HPC_REPORT_LINE\""
+      , "    ;;"
+      , "  show)"
+      , "    printf '%s\\n' \"$FAKE_HPC_SHOW_OUTPUT\""
+      , "    ;;"
+      , "  *)"
+      , "    echo \"unexpected hpc args: $*\" >&2"
+      , "    exit 1"
+      , "    ;;"
+      , "esac"
       ]
     makeExecutable fakeHpc
 
