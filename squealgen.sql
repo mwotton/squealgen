@@ -285,6 +285,7 @@ create temporary view tableComments as (
 
 create temporary view constraintDefs as (
 SELECT
+  con.oid AS conoid,
   con.conname AS conname,
   con.contype AS contype,
   nsp.nspname AS nsp,
@@ -292,7 +293,8 @@ SELECT
   col.cols,
   fnsp.nspname AS fnsp,
   ftab.relname AS ftab,
-  fcol.fcols
+  fcol.fcols,
+  pg_catalog.pg_get_constraintdef(con.oid, true) AS condef
 FROM pg_catalog.pg_constraint AS con
 join pg_catalog.pg_namespace n on n.oid = con.connamespace
 INNER JOIN pg_catalog.pg_class AS tab
@@ -301,7 +303,9 @@ INNER JOIN pg_catalog.pg_namespace AS nsp
 ON con.connamespace = nsp.oid
 LEFT JOIN LATERAL (select array_agg (all col.attname ORDER BY array_position(con.conkey, col.attnum) ASC) cols
 		   from pg_catalog.pg_attribute col
-		   where con.conkey @> ARRAY[col.attnum]
+		   where col.attnum > 0
+		   and not col.attisdropped
+		   and con.conkey @> ARRAY[col.attnum]
 		   and con.conrelid = col.attrelid
 		   ) col on true
 LEFT OUTER JOIN pg_catalog.pg_class AS ftab
@@ -312,12 +316,15 @@ ON ftab.relnamespace = fnsp.oid
 --ON con.confkey @> ARRAY[fcol.attnum] AND con.confrelid = fcol.attrelid
 LEFT JOIN LATERAL (select array_agg (all fcol.attname ORDER BY array_position(con.confkey, fcol.attnum) ASC) fcols
 		   from pg_catalog.pg_attribute fcol
-		   where con.confkey @> ARRAY[fcol.attnum]
+		   where fcol.attnum > 0
+		   and not fcol.attisdropped
+		   and con.confkey @> ARRAY[fcol.attnum]
 		   and con.confrelid = fcol.attrelid
 		   ) fcol on true
 WHERE con.contype IN ('f', 'c', 'p', 'u')
 AND  n.nspname=:'chosen_schema'
 GROUP BY
+  con.oid,
   con.conname,
   con.contype,
   nsp.nspname,
@@ -325,7 +332,8 @@ GROUP BY
   fnsp.nspname,
   ftab.relname,
   col.cols,
-  fcol.fcols
+  fcol.fcols,
+  pg_catalog.pg_get_constraintdef(con.oid, true)
 );
 
 select coalesce(string_agg(allDefs.tabData, E'\n'),'') as defs,
@@ -345,16 +353,29 @@ from (select table_name, string_agg(columnDefs.haskCols, E'\n  ,') as cols
       group by table_name
       order by table_name COLLATE "C") defs
 left join (select table_name,
-	     string_agg(format('"%s" ::: %s',constraintDefs.conname,
-	       case contype
-	       when 'p' then format('''PrimaryKey ''["%s"]', array_to_string(cols, '","'))
-	       when 'f' then format('''ForeignKey ''["%s"] "%s" "%s" ''["%s"]', array_to_string(cols,'","'), fnsp, ftab, array_to_string(fcols, '","'))
-	       when 'u' then format('''Unique ''["%s"]', array_to_string(cols,'","'))
-	       else pg_temp.croak (format('bad type %s',contype))
-	       end)
+	     string_agg(
+               case
+               when contype = 'c' then
+                 format(E'-- | %s\n  "%s" ::: %s',
+                   constraintDefs.condef,
+                   constraintDefs.conname,
+                   case
+                     when constraintDefs.cols is null or cardinality(constraintDefs.cols) = 0
+                       then '''Check ''[]'
+                     else format('''Check ''["%s"]', array_to_string(constraintDefs.cols,'","'))
+                   end)
+               else
+                 format('"%s" ::: %s',constraintDefs.conname,
+	           case contype
+	           when 'p' then format('''PrimaryKey ''["%s"]', array_to_string(cols, '","'))
+	           when 'f' then format('''ForeignKey ''["%s"] "%s" "%s" ''["%s"]', array_to_string(cols,'","'), fnsp, ftab, array_to_string(fcols, '","'))
+	           when 'u' then format('''Unique ''["%s"]', array_to_string(cols,'","'))
+	           else pg_temp.croak (format('bad type %s',contype))
+	           end)
+               end
 			, E'\n  ,' order by (constraintDefs.conname ::text) COLLATE "C") as str
 from constraintDefs
-where contype in ('p', 'f', 'u') -- should also handle 'c' for check, but not now.
+where contype in ('p', 'f', 'u', 'c')
 group by table_name
 order by (table_name :: text) COLLATE "C" ) cd on cd.table_name = defs.table_name
 group by defs.table_name
@@ -615,3 +636,36 @@ WHERE pg_type.typtype = 'd' AND nspname = :'chosen_schema' \gset
 
 \echo :domains
 \echo :decls
+
+select case
+         when count(*) = 0 then '-- Omitted/fallback check constraints: none'
+         else E'-- Omitted/fallback check constraints:\n'
+              || string_agg(line, E'\n' order by (line :: text) COLLATE "C")
+       end as omitted_fallback_check_constraints
+from (
+  select format(
+           E'--   %s.%s %s: expression emitted as Haddock note only (%s)',
+           c.nsp,
+           c.table_name,
+           c.conname,
+           c.condef
+         ) as line
+  from constraintDefs c
+  where c.contype = 'c'
+  union all
+  select format(
+           E'--   domain %s.%s %s: not representable in Domains typedef output (%s)',
+           dn.nspname,
+           dt.typname,
+           con.conname,
+           pg_catalog.pg_get_constraintdef(con.oid, true)
+         ) as line
+  from pg_catalog.pg_constraint con
+  join pg_catalog.pg_type dt
+    on dt.oid = con.contypid
+  join pg_catalog.pg_namespace dn
+    on dn.oid = dt.typnamespace
+  where con.contype = 'c'
+    and dn.nspname = :'chosen_schema'
+) fallback_checks \gset
+\echo :omitted_fallback_check_constraints

@@ -50,6 +50,7 @@ test-suite tests
       Basic.DBSpec
       Basic.Public
       Checks.DBSpec
+      Checks.Public
       CheckSchemaScript.DBSpec
       ComplexPrimary.DBSpec
       ComplexPrimary.Public
