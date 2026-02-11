@@ -49,6 +49,7 @@ test-suite tests
       Arrays.Public
       Basic.DBSpec
       Basic.Public
+      Checks.DBSpec
       CheckSchemaScript.DBSpec
       ComplexPrimary.DBSpec
       ComplexPrimary.Public

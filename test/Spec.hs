@@ -6,6 +6,7 @@ import           Test.Tasty.Hspec
 import qualified Arrays.DBSpec
 import qualified Basic.DBSpec
 import qualified CheckSchemaScript.DBSpec
+import qualified Checks.DBSpec
 import qualified ComplexPrimary.DBSpec
 import qualified CompositeForeignKeys.DBSpec
 import qualified Composites.DBSpec
@@ -27,6 +28,7 @@ main = do
   hspecTrees <- sequence
     [ testSpec "Arrays.DB" Arrays.DBSpec.spec
     , testSpec "Basic.DB" Basic.DBSpec.spec
+    , testSpec "Checks.DB" Checks.DBSpec.spec
     , testSpec "CheckSchemaScript.DB" CheckSchemaScript.DBSpec.spec
     , testSpec "ComplexPrimary.DB" ComplexPrimary.DBSpec.spec
     , testSpec "CompositeForeignKeys.DB" CompositeForeignKeys.DBSpec.spec
