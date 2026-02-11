@@ -127,6 +127,54 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
     workflow <- readFile ".github/workflows/ci.yml"
     workflow `shouldSatisfy` ("run: ./check_coverage.sh" `isInfixOf`)
 
+  it "coverage gate fails when expression denominator is zero" $ do
+    repoRoot <- getCurrentDirectory
+    withSystemTempDirectory "coverage-zero-denominator" $ \tmpDir -> do
+      let coverageScript = tmpDir </> "check_coverage.sh"
+          fakeBin = tmpDir </> "bin"
+          fakeCabal = fakeBin </> "cabal"
+          fakeHpc = fakeBin </> "hpc"
+          fakeTestBin = tmpDir </> "fake-tests-bin"
+          srcDir = tmpDir </> "src"
+          mixPkgDir = tmpDir </> "dist-newstyle" </> "build" </> "x" </> "hpc" </> "mix" </> "pkg"
+          envVars = [("FAKE_TEST_BIN", fakeTestBin), ("FAKE_HPC_REPORT_LINE", "100% expressions used (0/0)")]
+      copyFile (repoRoot </> "check_coverage.sh") coverageScript
+      makeExecutable coverageScript
+      createDirectoryIfMissing True fakeBin
+      createDirectoryIfMissing True srcDir
+      createDirectoryIfMissing True mixPkgDir
+      writeFile (srcDir </> "Foo.hs") "module Foo where\nfoo :: Int\nfoo = 1\n"
+      writeFile fakeTestBin "#!/usr/bin/env bash\nset -euo pipefail\n: \"${HPCTIXFILE:?missing HPCTIXFILE}\"\ntouch \"$HPCTIXFILE\"\n"
+      makeExecutable fakeTestBin
+      writeFile fakeCabal $ unlines
+        [ "#!/usr/bin/env bash"
+        , "set -euo pipefail"
+        , "if [[ \"$1\" == \"build\" ]]; then exit 0; fi"
+        , "if [[ \"$1\" == \"list-bin\" ]]; then"
+        , "  printf '%s\\n' \"$FAKE_TEST_BIN\""
+        , "  exit 0"
+        , "fi"
+        , "echo \"unexpected cabal args: $*\" >&2"
+        , "exit 1"
+        ]
+      makeExecutable fakeCabal
+      writeFile fakeHpc $ unlines
+        [ "#!/usr/bin/env bash"
+        , "set -euo pipefail"
+        , "if [[ \"$1\" != \"report\" ]]; then"
+        , "  echo \"unexpected hpc args: $*\" >&2"
+        , "  exit 1"
+        , "fi"
+        , "printf '%s\\n' \"$FAKE_HPC_REPORT_LINE\""
+        ]
+      makeExecutable fakeHpc
+
+      env <- ((envVars ++) . overridePath fakeBin) <$> getEnvironment
+      let cmd = (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_coverage.sh"]) { env = Just env }
+      (exitCode, _, err) <- readCreateProcessWithExitCode cmd ""
+      exitCode `shouldBe` ExitFailure 1
+      err `shouldSatisfy` ("denominator is zero" `isInfixOf`)
+
   it "drift checker fails on SQL and mode drift, then passes after regeneration" $ do
     repoRoot <- getCurrentDirectory
     withSystemTempDirectory "squealgen-drift-check" $ \tmpDir -> do
