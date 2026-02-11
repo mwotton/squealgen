@@ -49,6 +49,7 @@ test-suite tests
       Arrays.Public
       Basic.DBSpec
       Basic.Public
+      CheckSchemaScript.DBSpec
       ComplexPrimary.DBSpec
       ComplexPrimary.Public
       CompositeForeignKeys.DBSpec
@@ -91,6 +92,7 @@ test-suite tests
       base >=4.7
     , bytestring
     , containers
+    , directory
     , falsify
     , filepath
     , generics-sop
