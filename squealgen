@@ -264,8 +264,12 @@ join (
          '"oid" ::: ''NoDef :=> ''NotNull PGoid' as colDef
   from pg_catalog.pg_class c
   join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+  join pg_catalog.pg_attribute a on a.attrelid = c.oid
   where n.nspname = :'chosen_schema'
     and c.relkind = 'r'
+    and a.attname = 'oid'
+    and a.attnum < 0
+    and not a.attisdropped
   ) mycolumns on mycolumns.table_name = tables.table_name
 
 WHERE table_type = 'BASE TABLE'

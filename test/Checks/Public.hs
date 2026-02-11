@@ -39,8 +39,7 @@ type Tables = ('[
    "checked_accounts" ::: 'Table CheckedAccountsTable]  :: [(Symbol,SchemumType)])
 
 -- defs
-type CheckedAccountsColumns = '["oid" ::: 'NoDef :=> 'NotNull PGoid
-  ,"id" ::: 'Def :=> 'NotNull PGint4
+type CheckedAccountsColumns = '["id" ::: 'Def :=> 'NotNull PGint4
   ,"amount" ::: 'NoDef :=> 'Null PGint8
   ,"balance" ::: 'NoDef :=> 'NotNull PGint8
   ,"status" ::: 'NoDef :=> 'Null PGtext

@@ -39,8 +39,7 @@ type Tables = ('[
    "integers" ::: 'Table IntegersTable]  :: [(Symbol,SchemumType)])
 
 -- defs
-type IntegersColumns = '["oid" ::: 'NoDef :=> 'NotNull PGoid
-  ,"num" ::: 'NoDef :=> 'NotNull PGint8]
+type IntegersColumns = '["num" ::: 'NoDef :=> 'NotNull PGint8]
 type IntegersConstraints = '[]
 type IntegersTable = IntegersConstraints :=> IntegersColumns
 
@@ -69,4 +68,3 @@ type Functions =
 -- Omitted SRF signatures:
 --   srf_any(anyelement): set-returning pseudotype return is not representable
 type Domains = '[]
-
