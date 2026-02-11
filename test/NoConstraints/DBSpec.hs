@@ -22,5 +22,6 @@ getFoos = query $ select_ #name (from $ table #foos)
 spec = describe "NoConstraints" $ do
   it "reads inserted rows with runtime query assertions" $
     runSession "NoConstraints" "Public" (do
+      define $ UnsafeDefinition (BS8.pack "INSERT INTO foos(name) VALUES ('squealgen');")
       getRows =<< execute getFoos)
       `shouldReturn` [Foo "squealgen"]

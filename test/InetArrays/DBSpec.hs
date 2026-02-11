@@ -28,5 +28,6 @@ spec = describe "Arrays" $ do
       Just r -> pure [AddressSets [r]]
       Nothing -> expectationFailure "failed to parse expected IP range literal" >> pure []
     runSession "InetArrays" "Public" (do
+      define $ UnsafeDefinition (BS8.pack "INSERT INTO address_sets(addresses) VALUES (ARRAY['192.168.0.0/24']::inet[]);")
       getRows =<< execute getFoos)
       `shouldReturn` expected

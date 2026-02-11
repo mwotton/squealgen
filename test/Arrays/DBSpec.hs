@@ -24,5 +24,6 @@ getFoos = Query nilParams (TextArrays . getVarArray <$> #name)
 spec = describe "Arrays" $ do
   it "round-trips text arrays via runtime query" $
     runSession "Arrays" "Public" (do
+      define $ UnsafeDefinition (BS8.pack "INSERT INTO text_arrays(name) VALUES (ARRAY['alpha','beta']::varchar[]);")
       getRows =<< execute getFoos)
       `shouldReturn` [TextArrays ["alpha", "beta"]]

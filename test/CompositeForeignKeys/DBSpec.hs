@@ -10,6 +10,7 @@ import CompositeForeignKeys.Public
 import Squeal.PostgreSQL
 import qualified Generics.SOP as SOP
 import qualified GHC.Generics as GHC
+import qualified Data.ByteString.Char8 as BS8
 import Test.Hspec (it,describe,shouldReturn)
 import Data.Int (Int32)
 
@@ -26,5 +27,9 @@ selectCompositeRows =
 spec = describe "CompositeForeignKeys" $ do
   it "enforces and reads composite-foreign-key rows at runtime" $
     runSession "CompositeForeignKeys" "Public" (do
+      define $ UnsafeDefinition $ BS8.pack $ unlines
+        [ "INSERT INTO table_one(table_two_id, col_one, col_two) VALUES (1, 11, 22);"
+        , "INSERT INTO table_two(table_two_id, col_one, col_two) VALUES (2, 11, 22);"
+        ]
       getRows =<< execute selectCompositeRows)
       `shouldReturn` [CompositeRow (Just 11)]
