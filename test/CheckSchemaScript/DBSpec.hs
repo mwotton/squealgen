@@ -201,6 +201,31 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
       (cleanExit, _, _) <- readCreateProcessWithExitCode (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_squealgen_drift.sh"]) ""
       cleanExit `shouldBe` ExitSuccess
 
+  it "drift checker supports deterministic fallback outside git worktrees" $ do
+    repoRoot <- getCurrentDirectory
+    withSystemTempDirectory "squealgen-drift-check-nongit" $ \tmpDir -> do
+      let driftScript = tmpDir </> "check_squealgen_drift.sh"
+          mkScript = tmpDir </> "mksquealgen.sh"
+          sqlFile = tmpDir </> "squealgen.sql"
+      copyFile (repoRoot </> "check_squealgen_drift.sh") driftScript
+      copyFile (repoRoot </> "mksquealgen.sh") mkScript
+      makeExecutable driftScript
+      makeExecutable mkScript
+      writeFile sqlFile "select 1;\n"
+
+      runInRepo tmpDir "bash ./mksquealgen.sh"
+
+      writeFile sqlFile "select 2;\n"
+      (driftExit, _, driftErr) <- readCreateProcessWithExitCode (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_squealgen_drift.sh"]) ""
+      driftExit `shouldBe` ExitFailure 1
+      driftErr `shouldSatisfy` ("squealgen drift detected" `isInfixOf`)
+      driftErr `shouldSatisfy` ("non-git fallback mode" `isInfixOf`)
+
+      runInRepo tmpDir "bash ./mksquealgen.sh"
+      (cleanExit, _, cleanErr) <- readCreateProcessWithExitCode (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_squealgen_drift.sh"]) ""
+      cleanExit `shouldBe` ExitSuccess
+      cleanErr `shouldSatisfy` (not . isInfixOf "squealgen drift detected")
+
   it "squealgen.sql contains a single stripDoublequotes definition" $ do
     sql <- readFile "squealgen.sql"
     countOccurrences "CREATE or replace FUNCTION pg_temp.stripDoublequotes" sql `shouldBe` 1
