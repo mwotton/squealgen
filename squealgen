@@ -124,6 +124,7 @@ select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
 \echo
 --\echo type Schema = Join (Join Tables Enums) Views
 \echo type Schema = Join Tables (Join Views (Join Enums (Join Functions (Join Composites Domains))))
+\echo -- Trigger contract: Triggers is generated metadata and is not composed into Schema.
 
 
 -- now we emit all the enumerations
@@ -766,6 +767,7 @@ create temporary view triggerDefs as (
 
 \echo
 \echo -- triggers
+\echo -- Trigger contract: Triggers is generated metadata and is not composed into Schema.
 select case
          when count(*) = 0 then E'type Triggers = \n  ''[]'
          else format(
