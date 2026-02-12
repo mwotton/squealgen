@@ -46,7 +46,7 @@ Treat `squealgen.sql` as the source of truth and do not edit `squealgen` directl
 Validation contract:
 
 - Local validation (`make test`): enforce `squealgen` drift parity and run the Haskell test suite.
-- CI validation (`make ci`): run `make test` plus `./check_coverage.sh` coverage policy gate.
+- CI validation (`make ci`): enforce drift parity, then run `./check_coverage.sh` (coverage-enabled build + tests + policy gate) as the single expensive test/compile pass.
 - GitHub Actions CI workflow execution order: environment/bootstrap steps, then `make ci` as the only validation entrypoint, then coverage artifact upload.
 - Coverage zero-denominator policy (`COVERAGE_ZERO_DENOMINATOR_POLICY=allow|fail`):
   - `fail` (default): fail explicitly when expression coverage denominator is zero.
