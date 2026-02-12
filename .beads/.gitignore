@@ -9,3 +9,8 @@
 # Temporary
 last-touched
 *.tmp
+
+# br local state
+.br_history/
+.local_version
+daemon.log
