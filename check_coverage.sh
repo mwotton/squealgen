@@ -35,9 +35,30 @@ if [[ ! "$threshold" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
   exit 1
 fi
 
+report_dir="$(trim "$report_dir")"
+if [[ -z "$report_dir" ]]; then
+  echo "ERROR: invalid COVERAGE_REPORT_DIR (must be a repository-relative subpath under the workspace, got empty value)" >&2
+  exit 1
+fi
+if [[ "$report_dir" == "/" || "$report_dir" == "." || "$report_dir" == ".." ]]; then
+  echo "ERROR: invalid COVERAGE_REPORT_DIR '$report_dir' (must be a repository-relative subpath under the workspace)" >&2
+  exit 1
+fi
+if [[ "$report_dir" == /* ]]; then
+  echo "ERROR: invalid COVERAGE_REPORT_DIR '$report_dir' (absolute paths are not allowed)" >&2
+  exit 1
+fi
+
+workspace_dir="$(pwd -P)"
+resolved_report_dir="$(realpath -m "$workspace_dir/$report_dir")"
+if [[ "$resolved_report_dir" == "$workspace_dir" || "$resolved_report_dir" != "$workspace_dir"/* ]]; then
+  echo "ERROR: invalid COVERAGE_REPORT_DIR '$report_dir' (resolves outside workspace '$workspace_dir')" >&2
+  exit 1
+fi
+
 # Coverage artifacts are run-specific; stale .tix files can cause hash mismatches.
-rm -rf "$report_dir"
-mkdir -p "$report_dir"
+rm -rf -- "$report_dir"
+mkdir -p -- "$report_dir"
 
 build_log="$(mktemp "$report_dir/build.XXXXXX.log")"
 if ! cabal build --enable-coverage --enable-per-component test:tests >"$build_log" 2>&1; then
@@ -170,8 +191,8 @@ if [[ "${#hpcdirs[@]}" -eq 0 ]]; then
 fi
 
 combined_hpcdir="$report_dir/mix"
-rm -rf "$combined_hpcdir"
-mkdir -p "$combined_hpcdir"
+rm -rf -- "$combined_hpcdir"
+mkdir -p -- "$combined_hpcdir"
 for dir in "${hpcdirs[@]}"; do
   while IFS= read -r pkg_dir; do
     pkg_name="$(basename "$pkg_dir")"
