@@ -63,6 +63,7 @@ Function-overload compatibility notes:
 - Generated output always includes deterministic disambiguated overloaded labels (`name__argtokens`).
 - When an overloaded base name has exactly one representable signature after filtering, a compatibility alias using the legacy simple name (`name`) is also emitted.
 - When two or more representable overloads remain, no legacy alias is emitted and generated output includes an explicit ambiguity note.
+- Trigger contract: generated `type Triggers` is metadata-only and is not currently composed into typed `Schema`.
 - Check-constraint and trigger fallback summaries are labeled as `fallback notes` to distinguish represented constraints/triggers from metadata-only fallbacks.
 
 you'll need
@@ -77,5 +78,5 @@ you'll need
 ## what next?
 
 - Remove string-hacking, generate in a more principled way.
-- Extract check constraints (maybe). This is much harder than the rest of it.
-- Improve function-label ergonomics while preserving overload safety.
+- Improve function-label ergonomics while preserving overload safety and readability.
+- Investigate richer type-level trigger/check representations while preserving current metadata fallback behavior.
