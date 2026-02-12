@@ -214,6 +214,19 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
     err `shouldSatisfy` ("below threshold 95%" `isInfixOf`)
     err `shouldSatisfy` ("(9/10)" `isInfixOf`)
 
+  it "coverage gate fails when synthetic probe markers are the measured scope" $ do
+    repoRoot <- getCurrentDirectory
+    let syntheticSource = unlines
+          [ "module Foo where"
+          , "ltreeCoverageProbe :: Bool"
+          , "ltreeCoverageProbe = True"
+          ]
+        fakeShow = "1 0 pkg:Foo 3:1-3:24 ExpBox False"
+    (exitCode, _, err, summary) <- runCoverageScriptWithSource repoRoot syntheticSource fakeShow "100% expressions used (1/1)" "100"
+    exitCode `shouldBe` ExitFailure 1
+    err `shouldSatisfy` ("synthetic-only coverage scope is not allowed" `isInfixOf`)
+    summary `shouldSatisfy` ("coverage_gate_result=fail" `isInfixOf`)
+
   it "coverage gate labels coverage-enabled build failures as toolchain failures" $ do
     repoRoot <- getCurrentDirectory
     let extraEnv = [("FAKE_CABAL_BUILD_FAIL", "1")]
@@ -514,6 +527,14 @@ runCoverageScriptWithAllowlist repoRoot fakeReportLine thresholdValue allowlistC
 
 runCoverageScriptWithAllowlistEnv :: FilePath -> String -> String -> String -> String -> [(String, String)] -> IO (ExitCode, String, String, String)
 runCoverageScriptWithAllowlistEnv repoRoot fakeReportLine thresholdValue allowlistContents fakeShowOutput extraEnv =
+  runCoverageScriptWithSourceAllowlistEnv repoRoot "module Foo where\nfoo :: Int\nfoo = 1\n" fakeShowOutput fakeReportLine thresholdValue allowlistContents extraEnv
+
+runCoverageScriptWithSource :: FilePath -> String -> String -> String -> String -> IO (ExitCode, String, String, String)
+runCoverageScriptWithSource repoRoot sourceContents fakeShowOutput fakeReportLine thresholdValue =
+  runCoverageScriptWithSourceAllowlistEnv repoRoot sourceContents fakeShowOutput fakeReportLine thresholdValue "" []
+
+runCoverageScriptWithSourceAllowlistEnv :: FilePath -> String -> String -> String -> String -> String -> [(String, String)] -> IO (ExitCode, String, String, String)
+runCoverageScriptWithSourceAllowlistEnv repoRoot sourceContents fakeShowOutput fakeReportLine thresholdValue allowlistContents extraEnv =
   withSystemTempDirectory "coverage-gate" $ \tmpDir -> do
     let coverageScript = tmpDir </> "check_coverage.sh"
         fakeBin = tmpDir </> "bin"
@@ -536,7 +557,7 @@ runCoverageScriptWithAllowlistEnv repoRoot fakeReportLine thresholdValue allowli
     createDirectoryIfMissing True fakeBin
     createDirectoryIfMissing True srcDir
     createDirectoryIfMissing True mixPkgDir
-    writeFile (srcDir </> "Foo.hs") "module Foo where\nfoo :: Int\nfoo = 1\n"
+    writeFile (srcDir </> "Foo.hs") sourceContents
     writeFile allowlistPath allowlistContents
     writeFile fakeTestBin "#!/usr/bin/env bash\nset -euo pipefail\n: \"${HPCTIXFILE:?missing HPCTIXFILE}\"\ntouch \"$HPCTIXFILE\"\n"
     makeExecutable fakeTestBin
