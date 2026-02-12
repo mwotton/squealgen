@@ -138,12 +138,30 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
     workflow <- readFile ".github/workflows/ci.yml"
     workflow `shouldSatisfy` (not . isInfixOf "run: ./check_coverage.sh")
 
-  it "coverage gate fails when expression denominator is zero" $ do
+  it "coverage gate marks zero-denominator expression coverage as not-applicable by default" $ do
     repoRoot <- getCurrentDirectory
     (exitCode, _, err, _) <- runCoverageScriptWithFakeReport repoRoot "100% expressions used (0/0)" "100"
+    exitCode `shouldBe` ExitSuccess
+    err `shouldBe` ""
+
+  it "coverage gate reports zero-denominator policy outcome metadata" $ do
+    repoRoot <- getCurrentDirectory
+    (exitCode, out, _, summary) <- runCoverageScriptWithFakeReport repoRoot "100% expressions used (0/0)" "100"
+    exitCode `shouldBe` ExitSuccess
+    out `shouldSatisfy` ("Coverage gate not-applicable: expression denominator is zero (0/0)" `isInfixOf`)
+    summary `shouldSatisfy` ("zero_denominator_policy=allow" `isInfixOf`)
+    summary `shouldSatisfy` ("zero_denominator_outcome=not-applicable" `isInfixOf`)
+    summary `shouldSatisfy` ("zero_denominator_triggered=true" `isInfixOf`)
+
+  it "coverage gate can be configured to fail on zero-denominator expression coverage" $ do
+    repoRoot <- getCurrentDirectory
+    let extraEnv = [("COVERAGE_ZERO_DENOMINATOR_POLICY", "fail")]
+    (exitCode, _, err, summary) <- runCoverageScriptWithFakeReportEnv repoRoot "100% expressions used (0/0)" "100" extraEnv
     exitCode `shouldBe` ExitFailure 1
     err `shouldSatisfy` ("denominator is zero" `isInfixOf`)
-    err `shouldSatisfy` ("(0/0)" `isInfixOf`)
+    summary `shouldSatisfy` ("zero_denominator_policy=fail" `isInfixOf`)
+    summary `shouldSatisfy` ("zero_denominator_outcome=fail" `isInfixOf`)
+    summary `shouldSatisfy` ("zero_denominator_triggered=true" `isInfixOf`)
 
   it "coverage gate passes when denominator is non-zero and threshold is met" $ do
     repoRoot <- getCurrentDirectory
@@ -282,10 +300,18 @@ overridePath fakeBin env = ("PATH", fakeBin <> ":" <> currentPath) : filter ((/=
 
 runCoverageScriptWithFakeReport :: FilePath -> String -> String -> IO (ExitCode, String, String, String)
 runCoverageScriptWithFakeReport repoRoot fakeReportLine thresholdValue =
-  runCoverageScriptWithAllowlist repoRoot fakeReportLine thresholdValue "" ""
+  runCoverageScriptWithFakeReportEnv repoRoot fakeReportLine thresholdValue []
+
+runCoverageScriptWithFakeReportEnv :: FilePath -> String -> String -> [(String, String)] -> IO (ExitCode, String, String, String)
+runCoverageScriptWithFakeReportEnv repoRoot fakeReportLine thresholdValue extraEnv =
+  runCoverageScriptWithAllowlistEnv repoRoot fakeReportLine thresholdValue "" "" extraEnv
 
 runCoverageScriptWithAllowlist :: FilePath -> String -> String -> String -> String -> IO (ExitCode, String, String, String)
 runCoverageScriptWithAllowlist repoRoot fakeReportLine thresholdValue allowlistContents fakeShowOutput =
+  runCoverageScriptWithAllowlistEnv repoRoot fakeReportLine thresholdValue allowlistContents fakeShowOutput []
+
+runCoverageScriptWithAllowlistEnv :: FilePath -> String -> String -> String -> String -> [(String, String)] -> IO (ExitCode, String, String, String)
+runCoverageScriptWithAllowlistEnv repoRoot fakeReportLine thresholdValue allowlistContents fakeShowOutput extraEnv =
   withSystemTempDirectory "coverage-gate" $ \tmpDir -> do
     let coverageScript = tmpDir </> "check_coverage.sh"
         fakeBin = tmpDir </> "bin"
@@ -301,7 +327,7 @@ runCoverageScriptWithAllowlist repoRoot fakeReportLine thresholdValue allowlistC
           , ("FAKE_HPC_SHOW_OUTPUT", fakeShowOutput)
           , ("COVERAGE_THRESHOLD", thresholdValue)
           , ("COVERAGE_ALLOWLIST_FILE", allowlistPath)
-          ]
+          ] <> extraEnv
         summaryPath = tmpDir </> "coverage" </> "summary.txt"
     copyFile (repoRoot </> "check_coverage.sh") coverageScript
     makeExecutable coverageScript
