@@ -141,7 +141,8 @@ with used_types as (
     (case when t.typcategory = 'A' then elem.oid else t.oid end) as type_oid,
     (case when t.typcategory = 'A' then elem.typname else t.typname end) as typname
   from information_schema.columns c
-  join pg_catalog.pg_type t on t.typname = c.udt_name
+  join pg_catalog.pg_namespace tns on tns.nspname = c.udt_schema
+  join pg_catalog.pg_type t on t.typname = c.udt_name and t.typnamespace = tns.oid
   left join pg_catalog.pg_type elem on t.typcategory = 'A' and elem.oid = t.typelem
   where c.table_schema = :'primary_schema'
   union
@@ -236,7 +237,8 @@ with used_enums as (
   -- From table/view columns in information_schema
   select distinct (case when t.typcategory = 'A' then elem.typname else t.typname end) as enumname
   from information_schema.columns c
-  join pg_catalog.pg_type t on t.typname = c.udt_name
+  join pg_catalog.pg_namespace tns on tns.nspname = c.udt_schema
+  join pg_catalog.pg_type t on t.typname = c.udt_name and t.typnamespace = tns.oid
   left join pg_catalog.pg_type elem on t.typcategory = 'A' and elem.oid = t.typelem
   join pg_catalog.pg_type base on (case when t.typcategory = 'A' then base.oid = elem.oid else base.oid = t.oid end)
   where c.table_schema = :'primary_schema'
