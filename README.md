@@ -38,9 +38,10 @@ My workflow looks like this:
 Treat `squealgen.sql` as the source of truth and do not edit `squealgen` directly.
 `./check_squealgen_drift.sh` is run by `make test` and CI to enforce this.
 `check_squealgen_drift.sh` supports `SQUEALGEN_DRIFT_MODE=auto|git|non-git`:
-- `auto` (default): use strict git diff checks in a worktree, otherwise compare pre/post regenerated `./squealgen` bytes + executable bit in fallback mode.
+- `auto` (default): use strict git-state checks in a worktree, otherwise compare existing `./squealgen` to a regenerated candidate in fallback mode.
 - `git`: require a git worktree and fail if unavailable.
 - `non-git`: force fallback comparison mode.
+- Clean drift checks are non-mutating for existing `./squealgen` artifacts (content, mode, and mtime stay stable when no drift exists).
 
 Validation contract:
 
@@ -59,6 +60,7 @@ Function-overload compatibility notes:
 - Generated output always includes deterministic disambiguated overloaded labels (`name__argtokens`).
 - When an overloaded base name has exactly one representable signature after filtering, a compatibility alias using the legacy simple name (`name`) is also emitted.
 - When two or more representable overloads remain, no legacy alias is emitted and generated output includes an explicit ambiguity note.
+- Check-constraint and trigger fallback summaries are labeled as `fallback notes` to distinguish represented constraints/triggers from metadata-only fallbacks.
 
 you'll need
 

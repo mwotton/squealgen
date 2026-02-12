@@ -70,7 +70,7 @@ type Functions =
 -- Omitted SRF signatures: none
 type Domains = '[]
 
--- Omitted/fallback check constraints: none
+-- Check-constraint fallback notes: none
 
 -- triggers
 type Triggers = 
@@ -79,4 +79,4 @@ type Triggers =
    , '("accounts_balance_guard", "CREATE CONSTRAINT TRIGGER accounts_balance_guard AFTER INSERT OR UPDATE ON accounts DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_balance_not_negative()")
    , '("accounts_before_row", "CREATE TRIGGER accounts_before_row BEFORE INSERT OR UPDATE ON accounts FOR EACH ROW EXECUTE FUNCTION log_account_row()") ]
 
--- Omitted/fallback triggers: none
+-- Trigger fallback notes: none

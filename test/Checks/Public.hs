@@ -66,7 +66,7 @@ type Functions =
 -- Omitted SRF signatures: none
 type Domains = '["positive_amount" ::: 'Typedef PGint8]
 type PGpositive_amount = PGint8
--- Omitted/fallback check constraints:
+-- Check-constraint fallback notes:
 --   domain public.positive_amount positive_amount_check: not representable in Domains typedef output (CHECK (VALUE > 0))
 --   public.checked_accounts amount_positive: expression emitted as Haddock note only (CHECK (amount > 0))
 --   public.checked_accounts balance_nonnegative: expression emitted as Haddock note only (CHECK (balance >= 0))
@@ -77,4 +77,4 @@ type PGpositive_amount = PGint8
 type Triggers = 
   '[]
 
--- Omitted/fallback triggers: none
+-- Trigger fallback notes: none

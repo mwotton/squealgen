@@ -683,8 +683,8 @@ WHERE pg_type.typtype = 'd' AND nspname = :'chosen_schema' \gset
 \echo :decls
 
 select case
-         when count(*) = 0 then '-- Omitted/fallback check constraints: none'
-         else E'-- Omitted/fallback check constraints:\n'
+         when count(*) = 0 then '-- Check-constraint fallback notes: none'
+         else E'-- Check-constraint fallback notes:\n'
               || string_agg(line, E'\n' order by (line :: text) COLLATE "C")
        end as omitted_fallback_check_constraints
 from (
@@ -804,8 +804,8 @@ select coalesce(
 \echo :fallback_trigger_haddocks
 
 select case
-         when count(*) = 0 then '-- Omitted/fallback triggers: none'
-         else E'-- Omitted/fallback triggers:\n'
+         when count(*) = 0 then '-- Trigger fallback notes: none'
+         else E'-- Trigger fallback notes:\n'
               || string_agg(
                    format(
                      E'--   %s on %s: full definition unavailable; emitted metadata fallback (%s %s %s%s)',

@@ -1,7 +1,12 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Property.DDLSpec (testTree) where
+module Property.DDLSpec
+  ( testTree
+  , SchemaDDL (..)
+  , checkSchema
+  , compileModule
+  ) where
 
 import           Control.Exception        (SomeException, displayException, try)
 import qualified Data.ByteString.Char8    as BS8

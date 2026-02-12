@@ -34,9 +34,13 @@ case "$drift_mode" in
 esac
 
 previous_squealgen=""
+candidate_squealgen="$(mktemp)"
 cleanup() {
   if [[ -n "${previous_squealgen}" && -e "${previous_squealgen}" ]]; then
     rm -f "${previous_squealgen}"
+  fi
+  if [[ -n "${candidate_squealgen}" && -e "${candidate_squealgen}" ]]; then
+    rm -f "${candidate_squealgen}"
   fi
 }
 trap cleanup EXIT
@@ -48,29 +52,45 @@ if [[ "${use_git_mode}" != "true" ]]; then
   fi
 fi
 
-./mksquealgen.sh
+SQUEALGEN_OUTPUT_PATH="${candidate_squealgen}" ./mksquealgen.sh
+
+candidate_is_executable="false"
+current_is_executable="false"
+if [[ -x "${candidate_squealgen}" ]]; then
+  candidate_is_executable="true"
+fi
+if [[ -x squealgen ]]; then
+  current_is_executable="true"
+fi
+candidate_differs=false
+if [[ ! -e squealgen ]] || ! cmp -s "${candidate_squealgen}" squealgen || [[ "${candidate_is_executable}" != "${current_is_executable}" ]]; then
+  candidate_differs=true
+fi
 
 if [[ "${use_git_mode}" == "true" ]]; then
-  if ! git diff --quiet -- squealgen || ! git diff --cached --quiet -- squealgen; then
+  if [[ "${candidate_differs}" == "true" ]]; then
     echo "squealgen drift detected. Run: ./mksquealgen.sh" >&2
+    if [[ -e squealgen ]]; then
+      diff -u --label "squealgen (committed artifact)" --label "squealgen (regenerated)" squealgen "${candidate_squealgen}" || true
+    else
+      echo "squealgen is missing from the working tree." >&2
+    fi
+    exit 1
+  fi
+  if ! git diff --quiet -- squealgen || ! git diff --cached --quiet -- squealgen; then
+    echo "squealgen drift detected in git state. Run: ./mksquealgen.sh and stage the updated artifact." >&2
     git --no-pager diff -- squealgen || true
     exit 1
   fi
 else
   if [[ -z "${previous_squealgen}" ]]; then
+    mv "${candidate_squealgen}" squealgen
+    candidate_squealgen=""
     exit 0
   fi
-  was_executable="false"
-  is_executable="false"
-  if [[ -x "${previous_squealgen}" ]]; then
-    was_executable="true"
-  fi
-  if [[ -x squealgen ]]; then
-    is_executable="true"
-  fi
-  if ! cmp -s "${previous_squealgen}" squealgen || [[ "${was_executable}" != "${is_executable}" ]]; then
+  if [[ "${candidate_differs}" == "true" ]]; then
     echo "squealgen drift detected in non-git fallback mode. Run: ./mksquealgen.sh and refresh distributed squealgen artifact." >&2
-    diff -u "${previous_squealgen}" squealgen || true
+    diff -u --label "squealgen (distributed artifact)" --label "squealgen (regenerated)" "${previous_squealgen}" "${candidate_squealgen}" || true
     exit 1
   fi
 fi

@@ -21,7 +21,7 @@ spec = describe "Checks" $ do
         hs `shouldContain` "-- | CHECK (balance >= 0)"
         hs `shouldContain` "-- | CHECK (status IS NULL OR char_length(status) > 0)"
         hs `shouldContain` "-- | CHECK (1 = 1)"
-        hs `shouldContain` "-- Omitted/fallback check constraints:"
+        hs `shouldContain` "-- Check-constraint fallback notes:"
         hs `shouldContain` "domain public.positive_amount positive_amount_check: not representable in Domains typedef output (CHECK (VALUE > 0))"
 
 runGenerator :: IO String

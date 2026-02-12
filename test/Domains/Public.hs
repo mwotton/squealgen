@@ -54,11 +54,11 @@ type Functions =
 -- Omitted SRF signatures: none
 type Domains = '["positive" ::: 'Typedef PGint8]
 type PGpositive = PGint8
--- Omitted/fallback check constraints:
+-- Check-constraint fallback notes:
 --   domain public.positive positive_check: not representable in Domains typedef output (CHECK (VALUE > 0 AND VALUE IS NOT NULL))
 
 -- triggers
 type Triggers = 
   '[]
 
--- Omitted/fallback triggers: none
+-- Trigger fallback notes: none

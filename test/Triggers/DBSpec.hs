@@ -23,7 +23,7 @@ spec = describe "Triggers" $ do
         hs `shouldContain` "CREATE TRIGGER accounts_after_stmt AFTER DELETE ON accounts FOR EACH STATEMENT EXECUTE FUNCTION log_account_stmt()"
         hs `shouldContain` "CREATE TRIGGER account_view_instead_row INSTEAD OF INSERT OR DELETE OR UPDATE ON account_view FOR EACH ROW EXECUTE FUNCTION account_view_iou()"
         hs `shouldContain` "CREATE CONSTRAINT TRIGGER accounts_balance_guard AFTER INSERT OR UPDATE ON accounts DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION check_balance_not_negative()"
-        hs `shouldContain` "-- Omitted/fallback triggers:"
+        hs `shouldContain` "-- Trigger fallback notes:"
         hs `shouldContain` "none"
         hs `shouldNotContain` "private_only_trigger"
 

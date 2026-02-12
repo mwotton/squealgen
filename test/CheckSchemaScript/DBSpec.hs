@@ -1,7 +1,7 @@
 module CheckSchemaScript.DBSpec (spec) where
 
 import           Data.List          (isInfixOf)
-import           System.Directory   (Permissions (..), copyFile, createDirectoryIfMissing, createDirectoryLink, doesFileExist, getCurrentDirectory, getPermissions, setPermissions)
+import           System.Directory   (Permissions (..), copyFile, createDirectoryIfMissing, createDirectoryLink, doesFileExist, getCurrentDirectory, getModificationTime, getPermissions, setPermissions)
 import           System.Environment (getEnvironment)
 import           System.Exit        (ExitCode (..))
 import           System.FilePath    ((</>))
@@ -421,6 +421,54 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
       (cleanExit, _, cleanErr) <- readCreateProcessWithExitCode (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_squealgen_drift.sh"]) ""
       cleanExit `shouldBe` ExitSuccess
       cleanErr `shouldSatisfy` (not . isInfixOf "squealgen drift detected")
+
+  it "drift checker avoids rewriting squealgen on clean git runs" $ do
+    repoRoot <- getCurrentDirectory
+    withSystemTempDirectory "squealgen-drift-check-git-clean-no-rewrite" $ \tmpDir -> do
+      let driftScript = tmpDir </> "check_squealgen_drift.sh"
+          mkScript = tmpDir </> "mksquealgen.sh"
+          sqlFile = tmpDir </> "squealgen.sql"
+          generated = tmpDir </> "squealgen"
+      copyFile (repoRoot </> "check_squealgen_drift.sh") driftScript
+      copyFile (repoRoot </> "mksquealgen.sh") mkScript
+      makeExecutable driftScript
+      makeExecutable mkScript
+      writeFile sqlFile "select 1;\n"
+
+      runInRepo tmpDir "bash ./mksquealgen.sh"
+      runInRepo tmpDir "git init -q"
+      runInRepo tmpDir "git config user.email test@example.com"
+      runInRepo tmpDir "git config user.name test"
+      runInRepo tmpDir "git add squealgen.sql squealgen mksquealgen.sh check_squealgen_drift.sh"
+      runInRepo tmpDir "git commit -q -m init"
+
+      beforeMtime <- getModificationTime generated
+      (exitCode, _, err) <- readCreateProcessWithExitCode (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_squealgen_drift.sh"]) ""
+      exitCode `shouldBe` ExitSuccess
+      err `shouldBe` ""
+      afterMtime <- getModificationTime generated
+      afterMtime `shouldBe` beforeMtime
+
+  it "drift checker avoids rewriting squealgen on clean non-git runs" $ do
+    repoRoot <- getCurrentDirectory
+    withSystemTempDirectory "squealgen-drift-check-nongit-clean-no-rewrite" $ \tmpDir -> do
+      let driftScript = tmpDir </> "check_squealgen_drift.sh"
+          mkScript = tmpDir </> "mksquealgen.sh"
+          sqlFile = tmpDir </> "squealgen.sql"
+          generated = tmpDir </> "squealgen"
+      copyFile (repoRoot </> "check_squealgen_drift.sh") driftScript
+      copyFile (repoRoot </> "mksquealgen.sh") mkScript
+      makeExecutable driftScript
+      makeExecutable mkScript
+      writeFile sqlFile "select 1;\n"
+
+      runInRepo tmpDir "bash ./mksquealgen.sh"
+      beforeMtime <- getModificationTime generated
+      (exitCode, _, err) <- readCreateProcessWithExitCode (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_squealgen_drift.sh"]) ""
+      exitCode `shouldBe` ExitSuccess
+      err `shouldBe` ""
+      afterMtime <- getModificationTime generated
+      afterMtime `shouldBe` beforeMtime
 
   it "drift checker bootstraps non-git runs when squealgen is absent" $ do
     repoRoot <- getCurrentDirectory
