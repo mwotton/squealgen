@@ -222,6 +222,13 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
     err `shouldSatisfy` ("simulated coverage build failure" `isInfixOf`)
     err `shouldSatisfy` ("ERROR [coverage-toolchain]" `isInfixOf`)
 
+  it "coverage gate enables per-component builds during coverage build" $ do
+    repoRoot <- getCurrentDirectory
+    let extraEnv = [("FAKE_CABAL_REQUIRE_PER_COMPONENT", "1")]
+    (exitCode, _, err, _) <- runCoverageScriptWithFakeReportEnv repoRoot "90% expressions used (9/10)" "80" extraEnv
+    exitCode `shouldBe` ExitSuccess
+    err `shouldSatisfy` (not . isInfixOf "missing --enable-per-component")
+
   it "coverage gate accepts decimal numeric COVERAGE_THRESHOLD values" $ do
     repoRoot <- getCurrentDirectory
     (exitCode, out, _, summary) <- runCoverageScriptWithFakeReport repoRoot "90% expressions used (9/10)" "89.5"
@@ -407,6 +414,12 @@ runCoverageScriptWithAllowlistEnv repoRoot fakeReportLine thresholdValue allowli
       [ "#!/usr/bin/env bash"
       , "set -euo pipefail"
       , "if [[ \"$1\" == \"build\" ]]; then"
+      , "  if [[ \"${FAKE_CABAL_REQUIRE_PER_COMPONENT:-0}\" == \"1\" ]]; then"
+      , "    if [[ \" $* \" != *\" --enable-per-component \"* ]]; then"
+      , "      echo \"missing --enable-per-component\" >&2"
+      , "      exit 22"
+      , "    fi"
+      , "  fi"
       , "  if [[ \"${FAKE_CABAL_BUILD_FAIL:-0}\" == \"1\" ]]; then"
       , "    echo \"simulated coverage build failure\" >&2"
       , "    exit 12"
