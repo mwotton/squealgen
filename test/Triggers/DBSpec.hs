@@ -29,11 +29,11 @@ spec = describe "Triggers" $ do
         hs `shouldNotContain` "private_only_trigger"
   it "orders duplicate trigger names deterministically across relations and runs" $ do
     out1 <- runGeneratorFromSchema
-      "./test/Triggers/schemas/CollidingNames/structure.sql"
+      "./test/Triggers/fixtures/colliding_structure.sql"
       "Triggers.Colliding.Generated"
       "public"
     out2 <- runGeneratorFromSchema
-      "./test/Triggers/schemas/CollidingNames/structure.sql"
+      "./test/Triggers/fixtures/colliding_structure.sql"
       "Triggers.Colliding.Generated"
       "public"
     out1 `shouldBe` out2
