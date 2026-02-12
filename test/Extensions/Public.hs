@@ -10,12 +10,14 @@
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -fno-warn-unticked-promoted-constructors #-}
 
-module Domains.Public where
+module Extensions.Public where
 import Squeal.PostgreSQL
 import GHC.TypeLits(Symbol)
 
+-- Required extensions:
+--   ltree
 
-
+type PGltree = UnsafePGType "ltree"
 
 
 type DB = '["public" ::: Schema]
@@ -33,12 +35,13 @@ type Composites =
 
 -- schema
 type Tables = ('[
-   "pluslove" ::: 'Table PlusloveTable]  :: [(Symbol,SchemumType)])
+   "paths" ::: 'Table PathsTable]  :: [(Symbol,SchemumType)])
 
 -- defs
-type PlusloveColumns = '["num" ::: 'NoDef :=> 'NotNull PGpositive]
-type PlusloveConstraints = '[]
-type PlusloveTable = PlusloveConstraints :=> PlusloveColumns
+type PathsColumns = '["id" ::: 'Def :=> 'NotNull PGint4
+  ,"path" ::: 'NoDef :=> 'NotNull PGltree]
+type PathsConstraints = '["paths_pkey" ::: 'PrimaryKey '["id"]]
+type PathsTable = PathsConstraints :=> PathsColumns
 
 -- VIEWS
 type Views = 
@@ -46,13 +49,12 @@ type Views =
 
 -- functions
 type Functions = 
-  '[ "increment_positive" ::: Function ('[ NotNull PGpositive ] :=> 'Returns ( 'Null PGpositive) ) ]
+  '[ "path_depth" ::: Function ('[ NotNull PGltree ] :=> 'Returns ( 'Null PGint4) ) ]
 -- Omitted function signatures: none
 -- Omitted SRF signatures: none
-type Domains = '["positive" ::: 'Typedef PGint8]
-type PGpositive = PGint8
--- Check-constraint fallback notes:
---   domain public.positive positive_check: not representable in Domains typedef output (CHECK (VALUE > 0 AND VALUE IS NOT NULL))
+type Domains = '[]
+
+-- Check-constraint fallback notes: none
 
 -- triggers
 -- Trigger contract: Triggers is generated metadata and is not composed into Schema.

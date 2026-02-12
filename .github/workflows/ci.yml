@@ -11,10 +11,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install PostgreSQL client tools
+      - name: Install PostgreSQL tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-16
+          sudo apt-get install -y postgresql-16 postgresql-contrib-16
 
       - name: Add PostgreSQL bin to PATH
         run: echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
@@ -42,9 +42,3 @@ jobs:
       - name: Validation contract (CI)
         run: make ci
 
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage/

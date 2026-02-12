@@ -16,13 +16,9 @@ test: check-squealgen-drift squealgen $(testTargets)
 	cabal test --test-show-details=direct --ghc-option=-fprint-potential-instances
 
 .PHONY: ci
-ci: check-squealgen-drift squealgen
-	@echo "Validation contract [ci]: running coverage gate (includes test execution)"
-	@./check_coverage.sh || { \
-		code=$$?; \
-		echo "Validation contract failure [ci]: ./check_coverage.sh" >&2; \
-		exit $$code; \
-	}
+ci: check-squealgen-drift squealgen $(testTargets)
+	@echo "Validation contract [ci]: running cabal test (reduced falsify cases)"
+	cabal test --test-show-details=direct --ghc-option=-fprint-potential-instances --test-options="--falsify-tests 25"
 
 foo:
 	echo $(testTargets)

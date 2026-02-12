@@ -14,17 +14,14 @@ module Basic.Public where
 import Squeal.PostgreSQL
 import GHC.TypeLits(Symbol)
 
-type PGname = UnsafePGType "name"
-type PGregclass = UnsafePGType "regclass"
-type PGltree = UnsafePGType "ltree"
-type PGcidr = UnsafePGType "cidr"
-type PGltxtquery = UnsafePGType "ltxtquery"
-type PGlquery = UnsafePGType "lquery"
+
+
 
 
 type DB = '["public" ::: Schema]
 
 type Schema = Join Tables (Join Views (Join Enums (Join Functions (Join Composites Domains))))
+-- Trigger contract: Triggers is generated metadata and is not composed into Schema.
 -- enums
 
 -- decls
@@ -65,6 +62,7 @@ type Domains = '[]
 -- Check-constraint fallback notes: none
 
 -- triggers
+-- Trigger contract: Triggers is generated metadata and is not composed into Schema.
 type Triggers = 
   '[]
 

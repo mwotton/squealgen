@@ -1,7 +1,6 @@
 \set QUIET
 \set ON_ERROR_STOP true
 
-set search_path to information_schema,:chosen_schema;
 \echo -- | This code was originally created by squealgen. Edit if you know how it got made and are willing to own it now.
 
 create or replace function pg_temp.croak(message text) returns text as $$
@@ -18,12 +17,38 @@ end;
 $$
 LANGUAGE plpgsql;
 
-CREATE or replace FUNCTION pg_temp.stripDoublequotes(arr text[]) RETURNS text[] AS $$
-begin
-   return array_agg(regexp_replace(component.f, '"+', '', 'g')) from unnest(arr) as component(f);
-end;
-$$
-LANGUAGE plpgsql;
+-- chosen_schema is treated as a comma-separated search_path fragment.
+-- We target the first schema in the fragment for generation, but set the full
+-- search_path safely (quote_ident for each element) without raw psql substitution.
+with raw_parts as (
+  select ordinality as ord, btrim(part) as raw
+    from unnest(string_to_array(:'chosen_schema', ',')) with ordinality as t(part, ordinality)
+), parts as (
+  select ord,
+         case
+           when raw = '' then null
+           when raw ~ '^".*"$' then replace(substr(raw, 2, length(raw) - 2), '""', '"')
+           else raw
+         end as ident
+    from raw_parts
+), nonempty as (
+  select ord, ident
+    from parts
+   where ident is not null
+), derived as (
+  select
+    case
+      when exists (select 1 from nonempty) then (select ident from nonempty order by ord limit 1)
+      else pg_temp.croak('chosen_schema is empty (expected a search_path fragment)')
+    end as primary_schema,
+    case
+      when exists (select 1 from nonempty) then 'information_schema,' || string_agg(quote_ident(ident), ',' order by ord)
+      else null
+    end as safe_search_path
+    from nonempty
+)
+select primary_schema, safe_search_path from derived \gset
+select set_config('search_path', :'safe_search_path', false) \gset
 
 create or replace function pg_temp.type_decl_from(data_type text, udt_name text, domain_name text, nullable bool, fieldlen cardinal_number) RETURNS text as $$
   select
@@ -95,17 +120,95 @@ from unnest(string_to_array(:'extra_imports', ',')) as s(i) \gset
 \echo :imports
 
 
--- should really move these out somehow
-\echo type PGname = UnsafePGType "name"
-\echo type PGregclass = UnsafePGType "regclass"
-\echo type PGltree = UnsafePGType "ltree"
-\echo type PGcidr = UnsafePGType "cidr"
-\echo type PGltxtquery = UnsafePGType "ltxtquery"
-\echo type PGlquery = UnsafePGType "lquery"
+-- Extension/unsafe-type support: emit UnsafePGType aliases only when referenced.
+create temporary view sg_used_base_types as
+with used_types as (
+  -- From table/view columns in information_schema
+  select distinct
+    (case when t.typcategory = 'A' then elem.oid else t.oid end) as type_oid,
+    (case when t.typcategory = 'A' then elem.typname else t.typname end) as typname
+  from information_schema.columns c
+  join pg_catalog.pg_type t on t.typname = c.udt_name
+  left join pg_catalog.pg_type elem on t.typcategory = 'A' and elem.oid = t.typelem
+  where c.table_schema = :'primary_schema'
+  union
+  -- From function arguments in the chosen schema
+  select distinct
+    (case when targ.typcategory = 'A' then elem2.oid else targ.oid end) as type_oid,
+    (case when targ.typcategory = 'A' then elem2.typname else targ.typname end) as typname
+  from pg_catalog.pg_proc p
+  join pg_catalog.pg_namespace ns on ns.oid = p.pronamespace
+  join unnest(p.proargtypes) as arg(oid) on true
+  join pg_catalog.pg_type targ on targ.oid = arg.oid
+  left join pg_catalog.pg_type elem2 on targ.typcategory = 'A' and elem2.oid = targ.typelem
+  where ns.nspname = :'primary_schema'
+  union
+  -- From function return types in the chosen schema
+  select distinct
+    (case when tret.typcategory = 'A' then elem3.oid else tret.oid end) as type_oid,
+    (case when tret.typcategory = 'A' then elem3.typname else tret.typname end) as typname
+  from pg_catalog.pg_proc p
+  join pg_catalog.pg_namespace ns on ns.oid = p.pronamespace
+  join pg_catalog.pg_type tret on tret.oid = p.prorettype
+  left join pg_catalog.pg_type elem3 on tret.typcategory = 'A' and elem3.oid = tret.typelem
+  where ns.nspname = :'primary_schema'
+  union
+  -- From composite type attributes in the chosen schema
+  select distinct
+    (case when att_t.typcategory = 'A' then elem4.oid else att_t.oid end) as type_oid,
+    (case when att_t.typcategory = 'A' then elem4.typname else att_t.typname end) as typname
+  from pg_catalog.pg_type comp
+  join pg_catalog.pg_namespace comp_ns on comp_ns.oid = comp.typnamespace
+  join pg_catalog.pg_class comp_cls on comp.typrelid = comp_cls.oid
+  join pg_catalog.pg_attribute a on a.attrelid = comp.typrelid and a.attnum > 0 and not a.attisdropped
+  join pg_catalog.pg_type att_t on att_t.oid = a.atttypid
+  left join pg_catalog.pg_type elem4 on att_t.typcategory = 'A' and elem4.oid = att_t.typelem
+  where comp_ns.nspname = :'primary_schema'
+    and comp.typtype = 'c'
+    and comp_cls.relkind = 'c'
+)
+select type_oid, typname from used_types;
 
+create temporary view sg_used_extensions as
+select distinct e.extname, t.typname
+from sg_used_base_types t
+join pg_catalog.pg_depend d
+  on d.classid = 'pg_type'::regclass
+ and d.objid = t.type_oid
+ and d.refclassid = 'pg_extension'::regclass
+ and d.deptype = 'e'
+join pg_catalog.pg_extension e
+  on e.oid = d.refobjid;
+
+with extnames as (select distinct extname from sg_used_extensions)
+select case
+         when count(*) = 0 then ''
+         else '-- Required extensions:' || E'\n' ||
+              string_agg(format('--   %s', extname), E'\n' order by (extname :: text) COLLATE "C") || E'\n'
+       end as required_extensions_comment
+from extnames \gset
+\echo :required_extensions_comment
+
+with manual_unsafe_types as (
+  select unnest(array['name','regclass','cidr']) as typname
+), unsafe_types as (
+  select distinct t.typname
+  from sg_used_base_types t
+  left join manual_unsafe_types m on m.typname = t.typname
+  left join (select distinct typname from sg_used_extensions) e on e.typname = t.typname
+  where m.typname is not null or e.typname is not null
+)
+select coalesce(
+         string_agg(
+           format('type PG%s = UnsafePGType "%s"', typname, typname),
+           E'\n'
+           order by (typname :: text) COLLATE "C"),
+         '') as unsafe_type_aliases
+from unsafe_types \gset
+\echo :unsafe_type_aliases
 \echo
 
-select format('type DB = ''["%s" ::: Schema]', :'chosen_schema') as db \gset
+select format('type DB = ''["%s" ::: Schema]', :'primary_schema') as db \gset
 \echo
 \echo :db
 \echo
@@ -123,7 +226,7 @@ with used_enums as (
   join pg_catalog.pg_type t on t.typname = c.udt_name
   left join pg_catalog.pg_type elem on t.typcategory = 'A' and elem.oid = t.typelem
   join pg_catalog.pg_type base on (case when t.typcategory = 'A' then base.oid = elem.oid else base.oid = t.oid end)
-  where c.table_schema = :'chosen_schema'
+  where c.table_schema = :'primary_schema'
     and base.typcategory = 'E'
   union
   -- From function arguments in the chosen schema
@@ -134,7 +237,7 @@ with used_enums as (
   join pg_catalog.pg_type targ on targ.oid = arg.oid
   left join pg_catalog.pg_type elem2 on targ.typcategory = 'A' and elem2.oid = targ.typelem
   join pg_catalog.pg_type base2 on (case when targ.typcategory = 'A' then base2.oid = elem2.oid else base2.oid = targ.oid end)
-  where ns.nspname = :'chosen_schema'
+  where ns.nspname = :'primary_schema'
     and base2.typcategory = 'E'
   union
   -- From function return types in the chosen schema
@@ -144,7 +247,7 @@ with used_enums as (
   join pg_catalog.pg_type tret on tret.oid = p.prorettype
   left join pg_catalog.pg_type elem3 on tret.typcategory = 'A' and elem3.oid = tret.typelem
   join pg_catalog.pg_type base3 on (case when tret.typcategory = 'A' then base3.oid = elem3.oid else base3.oid = tret.oid end)
-  where ns.nspname = :'chosen_schema'
+  where ns.nspname = :'primary_schema'
     and base3.typcategory = 'E'
   union
   -- From composite type attributes in the chosen schema
@@ -156,7 +259,7 @@ with used_enums as (
   join pg_catalog.pg_type att_t on att_t.oid = a.atttypid
   left join pg_catalog.pg_type elem4 on att_t.typcategory = 'A' and elem4.oid = att_t.typelem
   join pg_catalog.pg_type base4 on (case when att_t.typcategory = 'A' then base4.oid = elem4.oid else base4.oid = att_t.oid end)
-  where comp_ns.nspname = :'chosen_schema'
+  where comp_ns.nspname = :'primary_schema'
     and comp.typtype = 'c'
     and comp_cls.relkind = 'c'
     and base4.typcategory = 'E'
@@ -204,7 +307,7 @@ join pg_type t on a.attrelid=t.typrelid
 join pg_type t2 on a.atttypid=t2.oid
 join pg_catalog.pg_namespace n ON n.oid = t.typnamespace
 join pg_class c on t.typrelid=c.oid
-where n.nspname=:'chosen_schema'
+where n.nspname=:'primary_schema'
 and t.typtype='c'
 and c.relkind='c'
 -- this is a bit of a guess, to be honest.
@@ -243,17 +346,17 @@ join (
            pg_temp.type_decl_from(data_type, udt_name, domain_name, false, character_maximum_length)
          ) as colDef
   from columns
-  where columns.table_schema = :'chosen_schema'
+  where columns.table_schema = :'primary_schema'
   union all
   -- Include system OID column for catalogs that expose it (e.g. pg_catalog)
-  select :'chosen_schema'::text as table_schema,
+  select :'primary_schema'::text as table_schema,
          c.relname          as table_name,
          0::information_schema.cardinal_number as ordinal_position,
          '"oid" ::: ''NoDef :=> ''NotNull PGoid' as colDef
   from pg_catalog.pg_class c
   join pg_catalog.pg_namespace n on n.oid = c.relnamespace
   join pg_catalog.pg_attribute a on a.attrelid = c.oid
-  where n.nspname = :'chosen_schema'
+  where n.nspname = :'primary_schema'
     and c.relkind = 'r'
     and a.attname = 'oid'
     and a.attnum < 0
@@ -261,7 +364,7 @@ join (
   ) mycolumns on mycolumns.table_name = tables.table_name
 
 WHERE table_type = 'BASE TABLE'
-  AND tables.table_schema = :'chosen_schema' --  NOT IN ('pg_catalog', 'information_schema')
+  AND tables.table_schema = :'primary_schema' --  NOT IN ('pg_catalog', 'information_schema')
 group by tables.table_catalog,
 	 tables.table_schema,
 	 tables.table_name,
@@ -283,7 +386,7 @@ create temporary view tableComments as (
          obj_description(c.oid, 'pg_class') as comment
   from pg_class c
   join pg_namespace n on n.oid = c.relnamespace
-  where n.nspname = :'chosen_schema'
+  where n.nspname = :'primary_schema'
     and c.relkind = 'r'
 );
 
@@ -327,7 +430,7 @@ LEFT JOIN LATERAL (select array_agg (all fcol.attname ORDER BY array_position(co
 		   and con.confrelid = fcol.attrelid
 		   ) fcol on true
 WHERE con.contype IN ('f', 'c', 'p', 'u')
-AND  n.nspname=:'chosen_schema'
+AND  n.nspname=:'primary_schema'
 GROUP BY
   con.oid,
   con.conname,
@@ -413,8 +516,8 @@ SELECT
 FROM information_schema.columns cols
 JOIN pg_catalog.pg_class c ON c.relname = cols.table_name
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-WHERE cols.table_schema = :'chosen_schema'
-  AND n.nspname = :'chosen_schema'
+WHERE cols.table_schema = :'primary_schema'
+  AND n.nspname = :'primary_schema'
   AND c.relkind IN ('v','m')
 GROUP BY cols.table_name, obj_description(c.oid, 'pg_class')
 ORDER BY (cols.table_name :: text) COLLATE "C");
@@ -422,7 +525,7 @@ ORDER BY (cols.table_name :: text) COLLATE "C");
 -- select coalesce(string_agg(allDefs.tabData, E'\n'),'') as defs,
 -- Emit the Views type list via a variable (short string),
 -- but print each View type definition row-by-row to avoid oversized variables.
-select format( E'type Views = \n  ''[%s]\n', coalesce(string_agg(format('"%s" ::: ''View %sView', viewname, pg_temp.initCaps(viewname)), ','), '')) as viewtype
+select format( E'type Views = \n  ''[%s]\n', coalesce(string_agg(format('"%s" ::: ''View %sView', viewname, pg_temp.initCaps(viewname)), ',' order by (viewname :: text) COLLATE "C"), '')) as viewtype
   from my_views \gset
 \echo :viewtype
 \pset tuples_only on
@@ -457,7 +560,7 @@ with function_meta as (
       on ns.oid = p.pronamespace
     join pg_catalog.pg_type ret
       on ret.oid = p.prorettype
-   where ns.nspname = :'chosen_schema'
+   where ns.nspname = :'primary_schema'
 ), function_args as (
   select fm.oid,
          string_agg(
@@ -678,7 +781,7 @@ SELECT format('type Domains = ''[%s]',
 FROM pg_catalog.pg_type
 JOIN pg_catalog.pg_namespace ON pg_namespace.oid = pg_type.typnamespace
 join pg_catalog.pg_type p2 on pg_type.typbasetype = p2.oid
-WHERE pg_type.typtype = 'd' AND nspname = :'chosen_schema' \gset
+WHERE pg_type.typtype = 'd' AND nspname = :'primary_schema' \gset
 
 \echo :domains
 \echo :decls
@@ -712,7 +815,7 @@ from (
   join pg_catalog.pg_namespace dn
     on dn.oid = dt.typnamespace
   where con.contype = 'c'
-    and dn.nspname = :'chosen_schema'
+    and dn.nspname = :'primary_schema'
 ) fallback_checks \gset
 \echo :omitted_fallback_check_constraints
 
@@ -748,7 +851,7 @@ create temporary view triggerDefs as (
     on rel.oid = t.tgrelid
   join pg_catalog.pg_namespace n
     on n.oid = rel.relnamespace
-  where n.nspname = :'chosen_schema'
+  where n.nspname = :'primary_schema'
     and not t.tgisinternal
 );
 

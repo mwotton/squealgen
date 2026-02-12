@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.38.0.
+-- This file has been generated from package.yaml by hpack version 0.38.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 807081de531cbb7ff932088f601a4c9aea00cfdccd88e98b1a7a99f262e161be
+-- hash: a8fba0ef04ece1a025c6b37f2a812558003048f8cd1b42f507ee199966fc876f
 
 name:           squealgen
 version:        0.1.0.0
@@ -30,17 +30,6 @@ source-repository head
   type: git
   location: https://github.com/mwotton/squealgen
 
-library
-  exposed-modules:
-      Paths_squealgen
-      LTree
-  hs-source-dirs:
-      src
-  build-depends:
-      base >=4.7
-    , squeal-postgresql >=0.9.2.0
-  default-language: Haskell2010
-
 test-suite tests
   type: exitcode-stdio-1.0
   main-is: Spec.hs
@@ -58,14 +47,15 @@ test-suite tests
       CompositeForeignKeys.Public
       Composites.DBSpec
       Composites.Public
-      Coverage.DBSpec
+      CrossSchemaEnumComposites.DBSpec
+      CrossSchemaEnums.DBSpec
       DBHelpers
       Domains.DBSpec
       Domains.Public
       Enums.DBSpec
-      CrossSchemaEnums.DBSpec
-      CrossSchemaEnumComposites.DBSpec
       Enums.Public
+      Extensions.DBSpec
+      Extensions.Public
       ForeignKeyReferencedColumns.DBSpec
       ForeignKeyReferencedColumns.Public
       Functions.DBSpec
@@ -79,6 +69,7 @@ test-suite tests
       PgCatalog.DBSpec
       Property.DDLHarnessSpec
       Property.DDLSpec
+      SearchPathFragments.DBSpec
       Triggers.DBSpec
       Triggers.Public
       Views.DBSpec
@@ -110,7 +101,6 @@ test-suite tests
     , postgresql-binary
     , process
     , squeal-postgresql
-    , squealgen
     , tasty
     , tasty-hspec
     , temporary

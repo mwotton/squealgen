@@ -16,8 +16,9 @@ on an existing database, it's tedious to have to set up the database types and k
 1. clone the repo and change into the directory
 2. `make prefix=$HOME/.local install`. (We will assume here that `$HOME/.local/bin` is in your path, obviously
 feel free to install wherever makes sense to you.)
-2. If my database is `cooldb`, my haskell module file is `Schema.hs`, and i want to use the `public` schema (the default),
-I would run `squealgen cooldb Schema public > ~/myproject/src/Schema.hs`.
+3. If my database is `cooldb`, my haskell module file is `Schema.hs`, and I want to generate from the `public` schema,
+   I would run `squealgen cooldb Schema public > ~/myproject/src/Schema.hs`.
+   `SCHEMA` is treated as a comma-separated `search_path` fragment, so you can pass `public,ext` if you also need `ext` on the path (e.g. for extension-owned types).
 
 You could integrate this in various ways: perhaps just as an initial scaffold, or perhaps integrated as part
 of your build process. A true madman could integrate this into a TH call, but I suspect this would be slow and
@@ -32,41 +33,36 @@ recommend it if you're running migrations through Haskell.
 
 My workflow looks like this:
 
-```make testwatch```
+```bash
+make testwatch
+```
 
 `squealgen` is generated from `squealgen.sql` via `./mksquealgen.sh`.
 Treat `squealgen.sql` as the source of truth and do not edit `squealgen` directly.
-`./check_squealgen_drift.sh` is run by `make test` and CI to enforce this.
-`check_squealgen_drift.sh` supports `SQUEALGEN_DRIFT_MODE=auto|git|non-git`:
-- `auto` (default): use strict git-state checks in a worktree, otherwise compare existing `./squealgen` to a regenerated candidate in fallback mode.
-- `git`: require a git worktree and fail if unavailable.
-- `non-git`: force fallback comparison mode.
-- Clean drift checks are non-mutating for existing `./squealgen` artifacts (content, mode, and mtime stay stable when no drift exists).
+
+`./check_squealgen_drift.sh` is run by `make test` and CI to enforce that the checked-in `./squealgen` script matches `squealgen.sql`.
 
 Validation contract:
 
-- Local validation (`make test`): enforce `squealgen` drift parity and run the Haskell test suite.
-- CI validation (`make ci`): enforce drift parity, then run `./check_coverage.sh` (coverage-enabled build + tests + policy gate) as the single expensive test/compile pass.
-- GitHub Actions CI workflow execution order: environment/bootstrap steps, then `make ci` as the only validation entrypoint, then coverage artifact upload.
-- Coverage zero-denominator policy (`COVERAGE_ZERO_DENOMINATOR_POLICY=allow|fail`):
-  - `fail` (default): fail explicitly when expression coverage denominator is zero.
-  - `allow`: manual local override to treat expression coverage `0/0` as not-applicable and pass deterministically.
-- Coverage summary metadata (`coverage/summary.txt`) includes zero-denominator policy outcome fields:
-  - `zero_denominator_policy`, `zero_denominator_triggered`, `zero_denominator_outcome`, `coverage_gate_result`.
-- Synthetic-only scope is rejected: if measured covered expressions are only `*CoverageProbe` placeholders, `./check_coverage.sh` fails with `ERROR [coverage-policy]`.
-- Coverage summary metadata also records synthetic-scope policy fields:
-  - `synthetic_probe_policy`, `synthetic_probe_outcome`, `covered_expressions_scanned`, `synthetic_probe_covered_expressions`.
-- Coverage measurability for CI is anchored by behavior checks over `LTree.ltreePathSegments` in `Coverage.DBSpec`, so strict zero-denominator failure remains enabled without an override.
+- Local validation (`make test`): enforce `squealgen` drift parity, regenerate fixture modules, then run `cabal test`.
+- CI validation (`make ci`): enforce drift parity, regenerate fixture modules, then run `cabal test` with reduced falsify cases (`--falsify-tests 25`) to keep runtime bounded.
+
+`SCHEMA` is treated as a comma-separated `search_path` fragment.
+The generator targets only the first schema in the fragment for emitted types, but sets the full `search_path` safely (quoted identifiers).
+
+Extension story:
+
+- If the schema references extension-owned types, squealgen emits opaque `UnsafePGType` aliases (e.g. `type PGltree = UnsafePGType "ltree"`) only when needed.
+- When any extension-owned types are present, generated output includes a comment block listing detected required extensions.
+- Users are responsible for installing extensions via migrations/DDL; CI enforces this via the `test/Extensions` ltree fixture.
 
 Function-overload compatibility notes:
 
 - Generated output always includes deterministic disambiguated overloaded labels (`name__argtokens`).
-- When an overloaded base name has exactly one representable signature after filtering, a compatibility alias using the legacy simple name (`name`) is also emitted.
-- When two or more representable overloads remain, no legacy alias is emitted and generated output includes an explicit ambiguity note.
-- Trigger contract: generated `type Triggers` is metadata-only and is not currently composed into typed `Schema`.
-- Check-constraint and trigger fallback summaries are labeled as `fallback notes` to distinguish represented constraints/triggers from metadata-only fallbacks.
+- When an overloaded base name has exactly one representable signature, a compatibility alias using the legacy simple name (`name`) is also emitted.
+- When two or more representable overloads remain, no legacy alias is emitted; callers must use the disambiguated labels.
 
-you'll need
+## you'll need
 
 - `initdb` from postgresql to be in your PATH. It typically isn't on Ubuntu systems, at least: usually in /usr/lib/postgresql/$VERSION_NUMBER/bin.
 - pg_tmp from here: https://eradman.com/ephemeralpg/code/ephemeralpg-3.0.tar.gz

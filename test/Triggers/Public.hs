@@ -14,17 +14,14 @@ module Triggers.Public where
 import Squeal.PostgreSQL
 import GHC.TypeLits(Symbol)
 
-type PGname = UnsafePGType "name"
-type PGregclass = UnsafePGType "regclass"
-type PGltree = UnsafePGType "ltree"
-type PGcidr = UnsafePGType "cidr"
-type PGltxtquery = UnsafePGType "ltxtquery"
-type PGlquery = UnsafePGType "lquery"
+
+
 
 
 type DB = '["public" ::: Schema]
 
 type Schema = Join Tables (Join Views (Join Enums (Join Functions (Join Composites Domains))))
+-- Trigger contract: Triggers is generated metadata and is not composed into Schema.
 -- enums
 
 -- decls
@@ -73,6 +70,7 @@ type Domains = '[]
 -- Check-constraint fallback notes: none
 
 -- triggers
+-- Trigger contract: Triggers is generated metadata and is not composed into Schema.
 type Triggers = 
   '[ '("account_view_instead_row", "CREATE TRIGGER account_view_instead_row INSTEAD OF INSERT OR DELETE OR UPDATE ON account_view FOR EACH ROW EXECUTE FUNCTION account_view_iou()")
    , '("accounts_after_stmt", "CREATE TRIGGER accounts_after_stmt AFTER DELETE ON accounts FOR EACH STATEMENT EXECUTE FUNCTION log_account_stmt()")
