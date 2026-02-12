@@ -1,7 +1,7 @@
 module CheckSchemaScript.DBSpec (spec) where
 
 import           Data.List          (isInfixOf)
-import           System.Directory   (Permissions (..), copyFile, createDirectoryIfMissing, doesFileExist, getCurrentDirectory, getPermissions, setPermissions)
+import           System.Directory   (Permissions (..), copyFile, createDirectoryIfMissing, createDirectoryLink, doesFileExist, getCurrentDirectory, getPermissions, setPermissions)
 import           System.Environment (getEnvironment)
 import           System.Exit        (ExitCode (..))
 import           System.FilePath    ((</>))
@@ -279,6 +279,88 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
     (exitCode, _, err, _) <- runCoverageScriptWithAllowlist repoRoot "90% expressions used (9/10)" "80" allowlist ""
     exitCode `shouldBe` ExitFailure 1
     err `shouldSatisfy` ("missing rationale" `isInfixOf`)
+
+  it "coverage gate rejects unsafe report directory '.' with a clear error before running build" $ do
+    repoRoot <- getCurrentDirectory
+    withSystemTempDirectory "coverage-report-dir-dot" $ \tmpDir -> do
+      let coverageScript = tmpDir </> "check_coverage.sh"
+          fakeBin = tmpDir </> "bin"
+          fakeCabal = fakeBin </> "cabal"
+          cabalTouched = tmpDir </> "cabal-touched"
+      copyFile (repoRoot </> "check_coverage.sh") coverageScript
+      makeExecutable coverageScript
+      createDirectoryIfMissing True fakeBin
+      writeFile fakeCabal $ unlines
+        [ "#!/usr/bin/env bash"
+        , "set -euo pipefail"
+        , "touch \"" <> cabalTouched <> "\""
+        , "exit 0"
+        ]
+      makeExecutable fakeCabal
+
+      env <- (("COVERAGE_REPORT_DIR", ".") :) . overridePath fakeBin <$> getEnvironment
+      let cmd = (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_coverage.sh"]) { env = Just env }
+      (exitCode, _, err) <- readCreateProcessWithExitCode cmd ""
+      exitCode `shouldBe` ExitFailure 1
+      err `shouldSatisfy` ("invalid COVERAGE_REPORT_DIR" `isInfixOf`)
+      doesFileExist cabalTouched `shouldReturn` False
+
+  it "coverage gate rejects report directory paths that escape through symlinks" $ do
+    repoRoot <- getCurrentDirectory
+    withSystemTempDirectory "coverage-report-dir-symlink-escape" $ \tmpDir -> do
+      let coverageScript = tmpDir </> "check_coverage.sh"
+          fakeBin = tmpDir </> "bin"
+          fakeCabal = fakeBin </> "cabal"
+          fakeHpc = fakeBin </> "hpc"
+          fakeTestBin = tmpDir </> "fake-tests-bin"
+          srcDir = tmpDir </> "src"
+          mixPkgDir = tmpDir </> "dist-newstyle" </> "build" </> "x" </> "hpc" </> "mix" </> "pkg"
+          outsideDir = tmpDir </> "outside"
+          outsideSubDir = outsideDir </> "sub"
+          outsideMarker = outsideSubDir </> "keep.txt"
+          reportsDir = tmpDir </> "reports"
+      copyFile (repoRoot </> "check_coverage.sh") coverageScript
+      makeExecutable coverageScript
+      createDirectoryIfMissing True fakeBin
+      createDirectoryIfMissing True srcDir
+      createDirectoryIfMissing True mixPkgDir
+      createDirectoryIfMissing True outsideSubDir
+      createDirectoryIfMissing True reportsDir
+      createDirectoryLink outsideDir (reportsDir </> "link")
+      writeFile outsideMarker "must-survive\n"
+      writeFile (srcDir </> "Foo.hs") "module Foo where\nfoo :: Int\nfoo = 1\n"
+      writeFile fakeTestBin "#!/usr/bin/env bash\nset -euo pipefail\n: \"${HPCTIXFILE:?missing HPCTIXFILE}\"\ntouch \"$HPCTIXFILE\"\n"
+      makeExecutable fakeTestBin
+      writeFile fakeCabal $ unlines
+        [ "#!/usr/bin/env bash"
+        , "set -euo pipefail"
+        , "if [[ \"$1\" == \"build\" ]]; then exit 0; fi"
+        , "if [[ \"$1\" == \"list-bin\" ]]; then"
+        , "  printf '%s\\n' \"$FAKE_TEST_BIN\""
+        , "  exit 0"
+        , "fi"
+        , "echo \"unexpected cabal args: $*\" >&2"
+        , "exit 1"
+        ]
+      makeExecutable fakeCabal
+      writeFile fakeHpc $ unlines
+        [ "#!/usr/bin/env bash"
+        , "set -euo pipefail"
+        , "if [[ \"$1\" == \"report\" ]]; then"
+        , "  printf '%s\\n' \"100% expressions used (1/1)\""
+        , "  exit 0"
+        , "fi"
+        , "echo \"unexpected hpc args: $*\" >&2"
+        , "exit 1"
+        ]
+      makeExecutable fakeHpc
+
+      env <- (("FAKE_TEST_BIN", fakeTestBin) :) . (("COVERAGE_REPORT_DIR", "reports/link/sub") :) . overridePath fakeBin <$> getEnvironment
+      let cmd = (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_coverage.sh"]) { env = Just env }
+      (exitCode, _, err) <- readCreateProcessWithExitCode cmd ""
+      exitCode `shouldBe` ExitFailure 1
+      err `shouldSatisfy` ("invalid COVERAGE_REPORT_DIR" `isInfixOf`)
+      doesFileExist outsideMarker `shouldReturn` True
 
   it "drift checker fails on SQL and mode drift, then passes after regeneration" $ do
     repoRoot <- getCurrentDirectory
