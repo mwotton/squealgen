@@ -37,3 +37,7 @@ testwatch: initdb_exists
 # todo: bomb out if `schema` doesn't exist.
 %.hs: schemas/%/structure.sql schemas/%/extra_imports squealgen
 	./buildTestSchema.sh $(dir $*) $(notdir $*)
+
+.PHONY: install-exe
+install-exe:
+	cabal install exe:squealgen --installdir=$(prefix)/bin --overwrite-policy=always

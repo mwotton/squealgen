@@ -19,10 +19,16 @@ description:         Please see the README on GitHub at <https://github.com/mwot
 
 dependencies:
 - base >= 4.7
-- squeal-postgresql >= 0.9.2.0
 
 data-files:
 - squealgen.sql
+
+executables:
+  squealgen:
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+    - process
 
 tests:
   tests:
@@ -41,7 +47,7 @@ tests:
     - bytestring
     - hspec
     - hspec-expectations-lifted
-    - squeal-postgresql
+    - squeal-postgresql >= 0.9.2.0
     - unliftio
     - generics-sop
     - text

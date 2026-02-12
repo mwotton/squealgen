@@ -14,8 +14,17 @@ on an existing database, it's tedious to have to set up the database types and k
 ## how?
 
 1. clone the repo and change into the directory
-2. `make prefix=$HOME/.local install`. (We will assume here that `$HOME/.local/bin` is in your path, obviously
-feel free to install wherever makes sense to you.)
+2. Install the executable (recommended):
+
+   ```bash
+   cabal install exe:squealgen --installdir=$HOME/.local/bin --overwrite-policy=always
+   ```
+
+   If you prefer the generated script (dev convenience), you can also run:
+
+   ```bash
+   make prefix=$HOME/.local install
+   ```
 3. If my database is `cooldb`, my haskell module file is `Schema.hs`, and I want to generate from the `public` schema,
    I would run `squealgen cooldb Schema public > ~/myproject/src/Schema.hs`.
    `SCHEMA` is treated as a comma-separated `search_path` fragment, so you can pass `public,ext` if you also need `ext` on the path (e.g. for extension-owned types).
