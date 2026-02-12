@@ -225,20 +225,61 @@ zero_denominator_triggered=false
 zero_denominator_outcome="not-triggered"
 coverage_gate_result="pass"
 failure_message=""
+synthetic_probe_policy="enforced"
+synthetic_probe_outcome="not-triggered"
+covered_expressions_scanned=0
+synthetic_probe_covered_expressions=0
 
 line_exclusions_applied=0
 line_exclusions_covered=0
-if (( line_exclusion_entries > 0 )); then
+hpc_show_log=""
+if (( expressions_total > 0 || line_exclusion_entries > 0 )); then
   hpc_show_log="$(mktemp "$report_dir/hpc-show.XXXXXX.log")"
   if ! hpc show "$latest_tix" --hpcdir "$combined_hpcdir" "${included_modules[@]}" >"$hpc_show_log" 2>&1; then
     cat "$hpc_show_log" >&2
     if grep -Fq "module mismatch with .tix/.mix file hash number" "$hpc_show_log"; then
       toolchain_error "coverage hash mismatch detected while collecting line-level exclusions; .tix and .mix inputs are inconsistent."
     fi
-    toolchain_error "hpc show failed while collecting line-level exclusions"
+    toolchain_error "hpc show failed while collecting coverage scope details"
     exit 1
   fi
+fi
 
+if [[ -n "$hpc_show_log" && "$expressions_total" -gt 0 ]]; then
+  mapfile -t covered_locations < <(awk '
+    NF >= 5 && $5 == "ExpBox" {
+      tick_count = $2 + 0
+      if (tick_count <= 0) next
+      split($3, module_parts, ":")
+      module_name = module_parts[length(module_parts)]
+      split($4, loc_parts, ":")
+      line_no = loc_parts[1] + 0
+      if (line_no > 0) print module_name ":" line_no
+    }
+  ' "$hpc_show_log" | sort -u)
+
+  covered_expressions_scanned="${#covered_locations[@]}"
+  for location in "${covered_locations[@]}"; do
+    module_name="${location%%:*}"
+    line_no="${location#*:}"
+    source_path="src/${module_name//./\/}.hs"
+    if [[ ! -f "$source_path" ]]; then
+      continue
+    fi
+    source_line="$(sed -n "${line_no}p" "$source_path" || true)"
+    if [[ "$source_line" =~ [A-Za-z][A-Za-z0-9_]*CoverageProbe[[:space:]]*= ]]; then
+      synthetic_probe_covered_expressions=$((synthetic_probe_covered_expressions + 1))
+    fi
+  done
+
+  if (( covered_expressions_scanned > 0 && synthetic_probe_covered_expressions == covered_expressions_scanned )); then
+    synthetic_probe_outcome="fail"
+    coverage_gate_result="fail"
+    failure_message="synthetic-only coverage scope is not allowed; replace *CoverageProbe placeholders with substantive behavior checks in src/"
+  fi
+fi
+
+if (( line_exclusion_entries > 0 )); then
   read -r line_exclusions_applied line_exclusions_covered expressions_used expressions_total <<<"$(awk -v ex_file="$line_exclusions_file" '
     BEGIN {
       FS = "[[:space:]]+"
@@ -287,6 +328,9 @@ if (( line_exclusion_entries > 0 )); then
     coverage_percent="$(awk -v u="$expressions_used" -v t="$expressions_total" 'BEGIN { p=(u*100)/t; if (p == int(p)) printf "%d", p; else printf "%.2f", p }')"
   fi
   echo "Applied line-level exclusions: ${line_exclusions_applied} expressions removed (${line_exclusions_covered} covered)"
+fi
+if [[ -n "$hpc_show_log" ]]; then
+  rm -f "$hpc_show_log"
 fi
 
 if [[ "$expressions_total" -eq 0 ]]; then
@@ -337,6 +381,10 @@ fi
   echo "zero_denominator_policy=$zero_denominator_policy"
   echo "zero_denominator_triggered=$zero_denominator_triggered"
   echo "zero_denominator_outcome=$zero_denominator_outcome"
+  echo "synthetic_probe_policy=$synthetic_probe_policy"
+  echo "synthetic_probe_outcome=$synthetic_probe_outcome"
+  echo "covered_expressions_scanned=$covered_expressions_scanned"
+  echo "synthetic_probe_covered_expressions=$synthetic_probe_covered_expressions"
   echo "coverage_gate_result=$coverage_gate_result"
   echo "tix=$latest_tix"
   echo "included_modules=${included_modules[*]}"

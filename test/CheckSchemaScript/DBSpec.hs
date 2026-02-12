@@ -221,7 +221,7 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
           , "ltreeCoverageProbe :: Bool"
           , "ltreeCoverageProbe = True"
           ]
-        fakeShow = "1 0 pkg:Foo 3:1-3:24 ExpBox False"
+        fakeShow = "0 1 pkg:Foo 3:1-3:24 ExpBox False"
     (exitCode, _, err, summary) <- runCoverageScriptWithSource repoRoot syntheticSource fakeShow "100% expressions used (1/1)" "100"
     exitCode `shouldBe` ExitFailure 1
     err `shouldSatisfy` ("synthetic-only coverage scope is not allowed" `isInfixOf`)
@@ -661,11 +661,15 @@ runCoverageScriptWithStaleTixGuard repoRoot =
     writeFile fakeHpc $ unlines
       [ "#!/usr/bin/env bash"
       , "set -euo pipefail"
-      , "if [[ \"$1\" != \"report\" ]]; then"
-      , "  echo \"unexpected hpc args: $*\" >&2"
-      , "  exit 1"
+      , "if [[ \"$1\" == \"report\" ]]; then"
+      , "  printf '%s\\n' \"$FAKE_HPC_REPORT_LINE\""
+      , "  exit 0"
       , "fi"
-      , "printf '%s\\n' \"$FAKE_HPC_REPORT_LINE\""
+      , "if [[ \"$1\" == \"show\" ]]; then"
+      , "  exit 0"
+      , "fi"
+      , "echo \"unexpected hpc args: $*\" >&2"
+      , "exit 1"
       ]
     makeExecutable fakeHpc
 
