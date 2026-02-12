@@ -4,6 +4,15 @@ set -euo pipefail
 threshold="${COVERAGE_THRESHOLD:-100}"
 report_dir="${COVERAGE_REPORT_DIR:-coverage}"
 allowlist_file="${COVERAGE_ALLOWLIST_FILE:-coverage-allowlist.txt}"
+zero_denominator_policy="${COVERAGE_ZERO_DENOMINATOR_POLICY:-allow}"
+
+case "$zero_denominator_policy" in
+  allow|fail) ;;
+  *)
+    echo "ERROR: invalid COVERAGE_ZERO_DENOMINATOR_POLICY '$zero_denominator_policy' (expected allow or fail)" >&2
+    exit 1
+    ;;
+esac
 
 trim() {
   local value="$1"
@@ -160,6 +169,10 @@ if [[ -z "$coverage_line" ]]; then
   exit 1
 fi
 read -r coverage_percent expressions_used expressions_total <<< "$coverage_line"
+zero_denominator_triggered=false
+zero_denominator_outcome="not-triggered"
+coverage_gate_result="pass"
+failure_message=""
 
 line_exclusions_applied=0
 line_exclusions_covered=0
@@ -217,19 +230,34 @@ if (( line_exclusion_entries > 0 )); then
   ' "$hpc_show_log")"
   rm -f "$hpc_show_log"
 
-  if [[ "$expressions_total" -eq 0 ]]; then
-    echo "ERROR: expression coverage denominator is zero after line-level exclusions (${expressions_used}/${expressions_total})" >&2
-    exit 1
+  if [[ "$expressions_total" -gt 0 ]]; then
+    coverage_percent="$(awk -v u="$expressions_used" -v t="$expressions_total" 'BEGIN { p=(u*100)/t; if (p == int(p)) printf "%d", p; else printf "%.2f", p }')"
   fi
-  coverage_percent="$(awk -v u="$expressions_used" -v t="$expressions_total" 'BEGIN { p=(u*100)/t; if (p == int(p)) printf "%d", p; else printf "%.2f", p }')"
   echo "Applied line-level exclusions: ${line_exclusions_applied} expressions removed (${line_exclusions_covered} covered)"
 fi
 
-echo "Parsed expression coverage: ${coverage_percent}% (${expressions_used}/${expressions_total})"
-
 if [[ "$expressions_total" -eq 0 ]]; then
-  echo "ERROR: expression coverage denominator is zero (${expressions_used}/${expressions_total}); refusing false-green coverage result" >&2
-  exit 1
+  zero_denominator_triggered=true
+  case "$zero_denominator_policy" in
+    allow)
+      zero_denominator_outcome="not-applicable"
+      coverage_gate_result="not-applicable"
+      coverage_percent="NA"
+      echo "Coverage gate not-applicable: expression denominator is zero (${expressions_used}/${expressions_total})"
+      ;;
+    fail)
+      zero_denominator_outcome="fail"
+      coverage_gate_result="fail"
+      coverage_percent="NA"
+      failure_message="ERROR: expression coverage denominator is zero (${expressions_used}/${expressions_total}) and policy is fail"
+      ;;
+  esac
+else
+  echo "Parsed expression coverage: ${coverage_percent}% (${expressions_used}/${expressions_total})"
+  if ! awk -v c="$coverage_percent" -v t="$threshold" 'BEGIN { exit ((c + 0) >= (t + 0) ? 0 : 1) }'; then
+    coverage_gate_result="fail"
+    failure_message="ERROR: expression coverage ${coverage_percent}% (${expressions_used}/${expressions_total}) is below threshold ${threshold}%"
+  fi
 fi
 
 {
@@ -253,13 +281,19 @@ fi
   echo "expressions_percent=$coverage_percent"
   echo "expressions_used=$expressions_used"
   echo "expressions_total=$expressions_total"
+  echo "zero_denominator_policy=$zero_denominator_policy"
+  echo "zero_denominator_triggered=$zero_denominator_triggered"
+  echo "zero_denominator_outcome=$zero_denominator_outcome"
+  echo "coverage_gate_result=$coverage_gate_result"
   echo "tix=$latest_tix"
   echo "included_modules=${included_modules[*]}"
 } > "$report_dir/summary.txt"
 
-if ! awk -v c="$coverage_percent" -v t="$threshold" 'BEGIN { exit ((c + 0) >= (t + 0) ? 0 : 1) }'; then
-  echo "ERROR: expression coverage ${coverage_percent}% (${expressions_used}/${expressions_total}) is below threshold ${threshold}%" >&2
+if [[ -n "$failure_message" ]]; then
+  echo "$failure_message" >&2
   exit 1
 fi
 
-echo "Coverage gate passed: ${coverage_percent}% (${expressions_used}/${expressions_total}) >= ${threshold}%"
+if [[ "$coverage_gate_result" == "pass" ]]; then
+  echo "Coverage gate passed: ${coverage_percent}% (${expressions_used}/${expressions_total}) >= ${threshold}%"
+fi

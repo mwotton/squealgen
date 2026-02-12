@@ -46,6 +46,11 @@ Validation contract:
 
 - Local validation (`make test`): enforce `squealgen` drift parity and run the Haskell test suite.
 - CI validation (`make ci`): run `make test` plus `./check_coverage.sh` coverage policy gate.
+- Coverage zero-denominator policy (`COVERAGE_ZERO_DENOMINATOR_POLICY=allow|fail`):
+  - `allow` (default): treat expression coverage `0/0` as not-applicable and pass deterministically.
+  - `fail`: fail explicitly when expression coverage denominator is zero.
+- Coverage summary metadata (`coverage/summary.txt`) includes zero-denominator policy outcome fields:
+  - `zero_denominator_policy`, `zero_denominator_triggered`, `zero_denominator_outcome`, `coverage_gate_result`.
 
 Function-overload compatibility notes:
 
