@@ -15,6 +15,7 @@ spec = describe "Triggers" $ do
       Left err -> expectationFailure ("setup failed: " <> displayException err)
       Right hs -> do
         hs `shouldContain` "-- triggers"
+        hs `shouldContain` "-- Trigger contract: `Triggers` is generated metadata and is not composed into `Schema`."
         hs `shouldContain` "type Triggers ="
         hs `shouldContain` "\"accounts_before_row\""
         hs `shouldContain` "\"accounts_after_stmt\""
