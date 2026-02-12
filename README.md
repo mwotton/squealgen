@@ -46,6 +46,7 @@ Validation contract:
 
 - Local validation (`make test`): enforce `squealgen` drift parity and run the Haskell test suite.
 - CI validation (`make ci`): run `make test` plus `./check_coverage.sh` coverage policy gate.
+- GitHub Actions CI workflow execution order: environment/bootstrap steps, then `make ci` as the only validation entrypoint, then coverage artifact upload.
 - Coverage zero-denominator policy (`COVERAGE_ZERO_DENOMINATOR_POLICY=allow|fail`):
   - `fail` (default): fail explicitly when expression coverage denominator is zero.
   - `allow`: manual local override to treat expression coverage `0/0` as not-applicable and pass deterministically.

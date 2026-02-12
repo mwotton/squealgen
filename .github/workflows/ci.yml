@@ -39,9 +39,6 @@ jobs:
       - name: Update package list
         run: cabal update
 
-      - name: Build
-        run: cabal build all
-
       - name: Validation contract (CI)
         run: make ci
 
