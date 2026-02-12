@@ -40,10 +40,10 @@ rm -rf "$report_dir"
 mkdir -p "$report_dir"
 
 build_log="$(mktemp "$report_dir/build.XXXXXX.log")"
-if ! cabal build --enable-coverage test:tests >"$build_log" 2>&1; then
+if ! cabal build --enable-coverage --enable-per-component test:tests >"$build_log" 2>&1; then
   cat "$build_log" >&2
   rm -f "$build_log"
-  toolchain_error "coverage-enabled build failed (cabal build --enable-coverage test:tests)"
+  toolchain_error "coverage-enabled build failed (cabal build --enable-coverage --enable-per-component test:tests)"
   exit 1
 fi
 rm -f "$build_log"
