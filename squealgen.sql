@@ -781,7 +781,9 @@ select case
                  E'\\\"'
                )
              ),
-             E'\n   , ' order by (td.trigger_name :: text) COLLATE "C"
+             E'\n   , ' order by (td.trigger_name :: text) COLLATE "C",
+                                (td.relation_name :: text) COLLATE "C",
+                                td.tgoid
            )
          )
        end as triggers
@@ -795,10 +797,12 @@ select coalesce(
              td.trigger_name,
              td.relation_name
            ),
-           E'\n' order by (td.trigger_name :: text) COLLATE "C"
-         ),
-         ''
-       ) as fallback_trigger_haddocks
+          E'\n' order by (td.trigger_name :: text) COLLATE "C",
+                         (td.relation_name :: text) COLLATE "C",
+                         td.tgoid
+        ),
+        ''
+      ) as fallback_trigger_haddocks
   from triggerDefs td
  where td.trigger_definition is null \gset
 \echo :fallback_trigger_haddocks
@@ -816,7 +820,9 @@ select case
                      td.trigger_events,
                      case when td.is_constraint_trigger then ', constraint trigger' else '' end
                    ),
-                   E'\n' order by (td.trigger_name :: text) COLLATE "C"
+                   E'\n' order by (td.trigger_name :: text) COLLATE "C",
+                                  (td.relation_name :: text) COLLATE "C",
+                                  td.tgoid
                  )
        end as omitted_fallback_triggers
   from triggerDefs td
