@@ -58,6 +58,7 @@ test-suite tests
       CompositeForeignKeys.Public
       Composites.DBSpec
       Composites.Public
+      Coverage.DBSpec
       DBHelpers
       Domains.DBSpec
       Domains.Public
