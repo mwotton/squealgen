@@ -15,7 +15,7 @@ IMPORTS=$4 # this can be empty.
 EOF
 
 echo 'PSQLCMD=${PSQLCMD:-psql}' >> "${output_path}"
-echo '$PSQLCMD -d "${DBNAME}" -v chosen_schema="${SCHEMA}" -v modulename="${MODULENAME}" -v extra_imports="${IMPORTS}" <<"EOF"' >> "${output_path}"
+echo '$PSQLCMD -X -d "${DBNAME}" -v chosen_schema="${SCHEMA}" -v modulename="${MODULENAME}" -v extra_imports="${IMPORTS}" <<"EOF"' >> "${output_path}"
 cat squealgen.sql >> "${output_path}"
 echo "EOF" >> "${output_path}"
 chmod 755 "${output_path}"

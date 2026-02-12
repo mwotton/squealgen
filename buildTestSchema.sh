@@ -19,6 +19,6 @@ extra_imports=$(cat "$basedir/schemas/$schema_/extra_imports")
 tmp=$(mktemp /tmp/squealgen.XXXXXX)
 echo "tmp is $tmp"
 
-psql -d "$db" < "$basedir/schemas/$schema_/structure.sql" &&
+psql -X -v ON_ERROR_STOP=1 -d "$db" < "$basedir/schemas/$schema_/structure.sql" &&
   ./squealgen "$db" "$modulename" "$schema" "$extra_imports" > "$tmp" &&
   ./check_schema "$tmp" "${basedir}/${schema_}.hs"

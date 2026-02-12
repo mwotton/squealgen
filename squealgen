@@ -10,7 +10,7 @@ MODULENAME=$2
 SCHEMA=$3
 IMPORTS=$4 # this can be empty.
 PSQLCMD=${PSQLCMD:-psql}
-$PSQLCMD -d "${DBNAME}" -v chosen_schema="${SCHEMA}" -v modulename="${MODULENAME}" -v extra_imports="${IMPORTS}" <<"EOF"
+$PSQLCMD -X -d "${DBNAME}" -v chosen_schema="${SCHEMA}" -v modulename="${MODULENAME}" -v extra_imports="${IMPORTS}" <<"EOF"
 \set QUIET
 \set ON_ERROR_STOP true
 
