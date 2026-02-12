@@ -51,6 +51,7 @@ Validation contract:
   - `allow`: manual local override to treat expression coverage `0/0` as not-applicable and pass deterministically.
 - Coverage summary metadata (`coverage/summary.txt`) includes zero-denominator policy outcome fields:
   - `zero_denominator_policy`, `zero_denominator_triggered`, `zero_denominator_outcome`, `coverage_gate_result`.
+- Coverage measurability for CI is anchored by `LTree.ltreeCoverageProbe`, exercised by `Coverage.DBSpec`, so strict zero-denominator failure remains enabled without an override.
 
 Function-overload compatibility notes:
 

@@ -152,7 +152,7 @@ for dir in "${hpcdirs[@]}"; do
   while IFS= read -r pkg_dir; do
     pkg_name="$(basename "$pkg_dir")"
     dest="$combined_hpcdir/$pkg_name"
-    ln -sfn "$pkg_dir" "$dest"
+    ln -sfn "$(realpath "$pkg_dir")" "$dest"
   done < <(find "$dir" -mindepth 1 -maxdepth 1 -type d -print)
 done
 

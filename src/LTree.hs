@@ -6,3 +6,6 @@ import           Squeal.PostgreSQL
 type PGltree = UnsafePGType "ltree"
 type PGltxtquery = UnsafePGType "ltxtquery"
 type PGlquery = UnsafePGType "lquery"
+
+ltreeCoverageProbe :: Bool
+ltreeCoverageProbe = True
