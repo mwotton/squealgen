@@ -169,30 +169,33 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
       invocationLog <- readFile logFile
       invocationLog `shouldBe` "drift\nmksquealgen\ntests\ncoverage\n"
 
-  it "coverage gate marks zero-denominator expression coverage as not-applicable by default" $ do
+  it "coverage gate fails on zero-denominator expression coverage by default" $ do
     repoRoot <- getCurrentDirectory
     (exitCode, _, err, _) <- runCoverageScriptWithFakeReport repoRoot "100% expressions used (0/0)" "100"
+    exitCode `shouldBe` ExitFailure 1
+    err `shouldSatisfy` ("denominator is zero" `isInfixOf`)
+    err `shouldSatisfy` ("COVERAGE_ZERO_DENOMINATOR_POLICY=allow" `isInfixOf`)
+
+  it "coverage gate reports fail policy metadata for zero-denominator default path" $ do
+    repoRoot <- getCurrentDirectory
+    (exitCode, _, _, summary) <- runCoverageScriptWithFakeReport repoRoot "100% expressions used (0/0)" "100"
+    exitCode `shouldBe` ExitFailure 1
+    summary `shouldSatisfy` ("zero_denominator_policy=fail" `isInfixOf`)
+    summary `shouldSatisfy` ("zero_denominator_outcome=fail" `isInfixOf`)
+    summary `shouldSatisfy` ("zero_denominator_triggered=true" `isInfixOf`)
+    summary `shouldSatisfy` ("coverage_gate_result=fail" `isInfixOf`)
+
+  it "coverage gate allows explicit local override for zero-denominator expression coverage" $ do
+    repoRoot <- getCurrentDirectory
+    let extraEnv = [("COVERAGE_ZERO_DENOMINATOR_POLICY", "allow")]
+    (exitCode, out, err, summary) <- runCoverageScriptWithFakeReportEnv repoRoot "100% expressions used (0/0)" "100" extraEnv
     exitCode `shouldBe` ExitSuccess
     err `shouldBe` ""
-
-  it "coverage gate reports zero-denominator policy outcome metadata" $ do
-    repoRoot <- getCurrentDirectory
-    (exitCode, out, _, summary) <- runCoverageScriptWithFakeReport repoRoot "100% expressions used (0/0)" "100"
-    exitCode `shouldBe` ExitSuccess
     out `shouldSatisfy` ("Coverage gate not-applicable: expression denominator is zero (0/0)" `isInfixOf`)
     summary `shouldSatisfy` ("zero_denominator_policy=allow" `isInfixOf`)
     summary `shouldSatisfy` ("zero_denominator_outcome=not-applicable" `isInfixOf`)
     summary `shouldSatisfy` ("zero_denominator_triggered=true" `isInfixOf`)
-
-  it "coverage gate can be configured to fail on zero-denominator expression coverage" $ do
-    repoRoot <- getCurrentDirectory
-    let extraEnv = [("COVERAGE_ZERO_DENOMINATOR_POLICY", "fail")]
-    (exitCode, _, err, summary) <- runCoverageScriptWithFakeReportEnv repoRoot "100% expressions used (0/0)" "100" extraEnv
-    exitCode `shouldBe` ExitFailure 1
-    err `shouldSatisfy` ("denominator is zero" `isInfixOf`)
-    summary `shouldSatisfy` ("zero_denominator_policy=fail" `isInfixOf`)
-    summary `shouldSatisfy` ("zero_denominator_outcome=fail" `isInfixOf`)
-    summary `shouldSatisfy` ("zero_denominator_triggered=true" `isInfixOf`)
+    summary `shouldSatisfy` ("coverage_gate_result=not-applicable" `isInfixOf`)
 
   it "coverage gate passes when denominator is non-zero and threshold is met" $ do
     repoRoot <- getCurrentDirectory

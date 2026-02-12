@@ -4,7 +4,7 @@ set -euo pipefail
 threshold="${COVERAGE_THRESHOLD:-100}"
 report_dir="${COVERAGE_REPORT_DIR:-coverage}"
 allowlist_file="${COVERAGE_ALLOWLIST_FILE:-coverage-allowlist.txt}"
-zero_denominator_policy="${COVERAGE_ZERO_DENOMINATOR_POLICY:-allow}"
+zero_denominator_policy="${COVERAGE_ZERO_DENOMINATOR_POLICY:-fail}"
 
 case "$zero_denominator_policy" in
   allow|fail) ;;
@@ -255,7 +255,7 @@ if [[ "$expressions_total" -eq 0 ]]; then
       zero_denominator_outcome="fail"
       coverage_gate_result="fail"
       coverage_percent="NA"
-      failure_message="ERROR: expression coverage denominator is zero (${expressions_used}/${expressions_total}) and policy is fail"
+      failure_message="ERROR: expression coverage denominator is zero (${expressions_used}/${expressions_total}) and policy is fail; either add measurable expression coverage scope or set COVERAGE_ZERO_DENOMINATOR_POLICY=allow for manual local runs"
       ;;
   esac
 else
