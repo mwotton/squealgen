@@ -115,7 +115,7 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
       driftErr `shouldSatisfy` ("squealgen drift detected" `isInfixOf`)
       driftErr `shouldSatisfy` ("./mksquealgen.sh" `isInfixOf`)
 
-  it "make ci executes drift check, tests, and coverage in order" $ do
+  it "make ci executes drift check and coverage in order without a separate cabal test pass" $ do
     repoRoot <- getCurrentDirectory
     withSystemTempDirectory "make-ci-contract" $ \tmpDir -> do
       let makefile = tmpDir </> "Makefile"
@@ -153,8 +153,8 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
         [ "#!/usr/bin/env bash"
         , "set -euo pipefail"
         , "if [[ \"$1\" == \"test\" ]]; then"
-        , "  printf 'tests\\n' >> \"$SQG_TEST_LOG\""
-        , "  exit 0"
+        , "  echo \"unexpected direct cabal test invocation from make ci\" >&2"
+        , "  exit 1"
         , "fi"
         , "echo \"unexpected cabal args: $*\" >&2"
         , "exit 1"
@@ -167,7 +167,7 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
       exitCode `shouldBe` ExitSuccess
       err `shouldSatisfy` (not . isInfixOf "Validation contract failure")
       invocationLog <- readFile logFile
-      invocationLog `shouldBe` "drift\nmksquealgen\ntests\ncoverage\n"
+      invocationLog `shouldBe` "drift\nmksquealgen\ncoverage\n"
 
   it "coverage gate fails on zero-denominator expression coverage by default" $ do
     repoRoot <- getCurrentDirectory
