@@ -69,7 +69,6 @@ you'll need
 
 ## what next?
 
-- support in-out parameters in functions, once I know how to model this in squeal
 - Remove string-hacking, generate in a more principled way.
 - Extract check constraints (maybe). This is much harder than the rest of it.
-- Triggers
+- Improve function-label ergonomics while preserving overload safety.

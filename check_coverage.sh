@@ -21,6 +21,12 @@ trim() {
   printf '%s' "$value"
 }
 
+threshold="$(trim "$threshold")"
+if [[ ! "$threshold" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+  echo "ERROR: invalid COVERAGE_THRESHOLD '$threshold' (expected numeric value, e.g. 95 or 95.5)" >&2
+  exit 1
+fi
+
 # Coverage artifacts are run-specific; stale .tix files can cause hash mismatches.
 rm -rf "$report_dir"
 mkdir -p "$report_dir"

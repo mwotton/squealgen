@@ -51,6 +51,8 @@ type Views =
 type Functions = 
   '[ "doubler" ::: Function ('[ Null PGint8 ] :=> 'Returns ( 'Null PGint8) )
    , "inout_only" ::: Function ('[ Null PGint8 ] :=> 'Returns ( 'Null PGint8) )
+   , "legacy_alias" ::: Function ('[ Null PGint8 ] :=> 'Returns ( 'Null PGint8) )
+   , "legacy_alias__int8" ::: Function ('[ Null PGint8 ] :=> 'Returns ( 'Null PGint8) )
    , "many_params" ::: Function ('[ NotNull PGint8,  NotNull PGfloat4,  NotNull PGtext ] :=> 'Returns ( 'Null PGtext) )
    , "mixed_in_inout" ::: Function ('[ Null PGint8,  Null PGint8 ] :=> 'Returns ( 'Null PGint8) )
    , "out_only" ::: Function ('[  ] :=> 'Returns ( 'Null PGint8) )
@@ -65,6 +67,7 @@ type Functions =
    , "zero_arg" ::: Function ('[  ] :=> 'Returns ( 'Null PGint8) ) ]
 -- Omitted function signatures:
 --   inout_params(int8): pseudotype return is not representable
+--   legacy_alias(anyelement): pseudotype argument is not representable
 -- Omitted SRF signatures:
 --   srf_any(anyelement): set-returning pseudotype return is not representable
 type Domains = '[]

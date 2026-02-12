@@ -466,7 +466,14 @@ with function_meta as (
            ',  ' order by args.arg_index
          ) filter (where args.arg_oid is not null) as arg_decls,
          string_agg(
-           regexp_replace(lower(type_arg.typname), '[^a-z0-9]+', '_', 'g'),
+           regexp_replace(
+             lower(
+               case
+                 when type_arg_ns.nspname = 'pg_catalog' then type_arg.typname
+                 else type_arg_ns.nspname || '_' || type_arg.typname
+               end
+             ),
+             '[^a-z0-9]+', '_', 'g'),
            '__' order by args.arg_index
          ) filter (where args.arg_oid is not null) as arg_tokens,
          bool_and(type_arg.typtype <> 'p') filter (where args.arg_oid is not null) as args_representable
@@ -475,6 +482,8 @@ with function_meta as (
       on true
     left join pg_catalog.pg_type type_arg
       on type_arg.oid = args.arg_oid
+    left join pg_catalog.pg_namespace type_arg_ns
+      on type_arg_ns.oid = type_arg.typnamespace
    group by fm.oid
 ), function_srf_outcols as (
   select fm.oid,
@@ -627,27 +636,6 @@ from (
      and funcs.compatibility_alias is not null
 ) entries \gset
 \echo :functions
-
-select case
-         when count(*) = 0 then '-- Overload compatibility aliases not emitted: none'
-         else E'-- Overload compatibility aliases not emitted:\n'
-              || string_agg(
-                   format(E'--   %s: ambiguous representable overloads (%s)',
-                     amb.proname,
-                     amb.arg_tokens_list),
-                   E'\n' order by (amb.proname :: text) COLLATE "C")
-       end as omitted_overload_compat_aliases
-  from (
-    select funcs.proname,
-           string_agg(
-             coalesce(nullif(replace(funcs.arg_tokens, '__', ', '), ''), 'noargs'),
-             ', ' order by (funcs.arg_tokens :: text) COLLATE "C") as arg_tokens_list
-      from my_functions funcs
-     where funcs.omission_reason is null
-     group by funcs.proname
-    having count(*) > 1
-  ) amb \gset
-\echo :omitted_overload_compat_aliases
 
 select case
          when count(*) = 0 then '-- Omitted function signatures: none'

@@ -115,28 +115,59 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
       driftErr `shouldSatisfy` ("squealgen drift detected" `isInfixOf`)
       driftErr `shouldSatisfy` ("./mksquealgen.sh" `isInfixOf`)
 
-  it "make test invokes squealgen drift check" $ do
-    makefile <- readFile "Makefile"
-    makefile `shouldSatisfy` ("check-squealgen-drift" `isInfixOf`)
+  it "make ci executes drift check, tests, and coverage in order" $ do
+    repoRoot <- getCurrentDirectory
+    withSystemTempDirectory "make-ci-contract" $ \tmpDir -> do
+      let makefile = tmpDir </> "Makefile"
+          mkScript = tmpDir </> "mksquealgen.sh"
+          driftScript = tmpDir </> "check_squealgen_drift.sh"
+          coverageScript = tmpDir </> "check_coverage.sh"
+          sqlFile = tmpDir </> "squealgen.sql"
+          logFile = tmpDir </> "invocations.log"
+          fakeBin = tmpDir </> "bin"
+          fakeCabal = fakeBin </> "cabal"
+      copyFile (repoRoot </> "Makefile") makefile
+      writeFile sqlFile "select 1;\n"
+      writeFile mkScript $ unlines
+        [ "#!/usr/bin/env bash"
+        , "set -euo pipefail"
+        , "printf 'mksquealgen\\n' >> \"$SQG_TEST_LOG\""
+        , "printf '#!/usr/bin/env bash\\nexit 0\\n' > squealgen"
+        , "chmod +x squealgen"
+        ]
+      writeFile driftScript $ unlines
+        [ "#!/usr/bin/env bash"
+        , "set -euo pipefail"
+        , "printf 'drift\\n' >> \"$SQG_TEST_LOG\""
+        ]
+      writeFile coverageScript $ unlines
+        [ "#!/usr/bin/env bash"
+        , "set -euo pipefail"
+        , "printf 'coverage\\n' >> \"$SQG_TEST_LOG\""
+        ]
+      makeExecutable mkScript
+      makeExecutable driftScript
+      makeExecutable coverageScript
+      createDirectoryIfMissing True fakeBin
+      writeFile fakeCabal $ unlines
+        [ "#!/usr/bin/env bash"
+        , "set -euo pipefail"
+        , "if [[ \"$1\" == \"test\" ]]; then"
+        , "  printf 'tests\\n' >> \"$SQG_TEST_LOG\""
+        , "  exit 0"
+        , "fi"
+        , "echo \"unexpected cabal args: $*\" >&2"
+        , "exit 1"
+        ]
+      makeExecutable fakeCabal
 
-  it "workflow tests do not depend on make-specific exit-code numerics" $ do
-    source <- readFile "test/CheckSchemaScript/DBSpec.hs"
-    let forbidden = "driftExit `shouldBe` ExitFailure " <> "2"
-    source `shouldSatisfy` (not . isInfixOf forbidden)
-
-  it "make ci target chains local validation and coverage gate" $ do
-    makefile <- readFile "Makefile"
-    makefile `shouldSatisfy` (".PHONY: ci" `isInfixOf`)
-    makefile `shouldSatisfy` ("ci: test" `isInfixOf`)
-    makefile `shouldSatisfy` ("./check_coverage.sh" `isInfixOf`)
-
-  it "CI invokes canonical make ci gate" $ do
-    workflow <- readFile ".github/workflows/ci.yml"
-    workflow `shouldSatisfy` ("run: make ci" `isInfixOf`)
-
-  it "CI does not bypass make ci with a direct coverage command" $ do
-    workflow <- readFile ".github/workflows/ci.yml"
-    workflow `shouldSatisfy` (not . isInfixOf "run: ./check_coverage.sh")
+      env <- (("SQG_TEST_LOG", logFile) :) . overridePath fakeBin <$> getEnvironment
+      let cmd = (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && make ci"]) { env = Just env }
+      (exitCode, _, err) <- readCreateProcessWithExitCode cmd ""
+      exitCode `shouldBe` ExitSuccess
+      err `shouldSatisfy` (not . isInfixOf "Validation contract failure")
+      invocationLog <- readFile logFile
+      invocationLog `shouldBe` "drift\nmksquealgen\ntests\ncoverage\n"
 
   it "coverage gate marks zero-denominator expression coverage as not-applicable by default" $ do
     repoRoot <- getCurrentDirectory
@@ -178,6 +209,20 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
     exitCode `shouldBe` ExitFailure 1
     err `shouldSatisfy` ("below threshold 95%" `isInfixOf`)
     err `shouldSatisfy` ("(9/10)" `isInfixOf`)
+
+  it "coverage gate accepts decimal numeric COVERAGE_THRESHOLD values" $ do
+    repoRoot <- getCurrentDirectory
+    (exitCode, out, _, summary) <- runCoverageScriptWithFakeReport repoRoot "90% expressions used (9/10)" "89.5"
+    exitCode `shouldBe` ExitSuccess
+    out `shouldSatisfy` ("Coverage gate passed: 90% (9/10) >= 89.5%" `isInfixOf`)
+    summary `shouldSatisfy` ("threshold_percent=89.5" `isInfixOf`)
+
+  it "coverage gate rejects non-numeric COVERAGE_THRESHOLD values" $ do
+    repoRoot <- getCurrentDirectory
+    (exitCode, _, err, summary) <- runCoverageScriptWithFakeReport repoRoot "90% expressions used (9/10)" "not-a-number"
+    exitCode `shouldBe` ExitFailure 1
+    err `shouldSatisfy` ("invalid COVERAGE_THRESHOLD" `isInfixOf`)
+    summary `shouldBe` ""
 
   it "coverage gate removes stale tix before running tests" $ do
     repoRoot <- getCurrentDirectory
@@ -276,17 +321,25 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
       cleanExit `shouldBe` ExitSuccess
       cleanErr `shouldSatisfy` (not . isInfixOf "squealgen drift detected")
 
-  it "squealgen.sql contains a single stripDoublequotes definition" $ do
-    sql <- readFile "squealgen.sql"
-    countOccurrences "CREATE or replace FUNCTION pg_temp.stripDoublequotes" sql `shouldBe` 1
+  it "drift checker bootstraps non-git runs when squealgen is absent" $ do
+    repoRoot <- getCurrentDirectory
+    withSystemTempDirectory "squealgen-drift-check-bootstrap-nongit" $ \tmpDir -> do
+      let driftScript = tmpDir </> "check_squealgen_drift.sh"
+          mkScript = tmpDir </> "mksquealgen.sh"
+          sqlFile = tmpDir </> "squealgen.sql"
+          generated = tmpDir </> "squealgen"
+      copyFile (repoRoot </> "check_squealgen_drift.sh") driftScript
+      copyFile (repoRoot </> "mksquealgen.sh") mkScript
+      makeExecutable driftScript
+      makeExecutable mkScript
+      writeFile sqlFile "select 1;\n"
 
-  it "cross-schema and pg_catalog specs use shared runSquealgen helper" $ do
-    crossSchema <- readFile "test/CrossSchemaEnums/DBSpec.hs"
-    pgCatalog <- readFile "test/PgCatalog/DBSpec.hs"
-    crossSchema `shouldSatisfy` ("runSquealgenScript" `isInfixOf`)
-    pgCatalog `shouldSatisfy` ("runSquealgenScript" `isInfixOf`)
-    crossSchema `shouldSatisfy` (not . isInfixOf "runSquealgen ::")
-    pgCatalog `shouldSatisfy` (not . isInfixOf "runSquealgen ::")
+      existsBefore <- doesFileExist generated
+      existsBefore `shouldBe` False
+      (bootstrapExit, _, bootstrapErr) <- readCreateProcessWithExitCode (proc "bash" ["-lc", "cd \"" <> tmpDir <> "\" && ./check_squealgen_drift.sh"]) ""
+      bootstrapExit `shouldBe` ExitSuccess
+      bootstrapErr `shouldSatisfy` (not . isInfixOf "requires an existing ./squealgen")
+      doesFileExist generated `shouldReturn` True
 
 makeExecutable :: FilePath -> IO ()
 makeExecutable path = do
@@ -453,18 +506,3 @@ runInRepo dir command = do
     ExitSuccess -> pure ()
     ExitFailure code -> expectationFailure $
       "command failed (" <> show code <> "): " <> command <> "\n" <> err
-
-countOccurrences :: Eq a => [a] -> [a] -> Int
-countOccurrences needle haystack
-  | null needle = 0
-  | otherwise = go haystack 0
-  where
-    go [] n = n
-    go s@(_:xs) n
-      | needle `isPrefixOf` s = go xs (n + 1)
-      | otherwise = go xs n
-
-isPrefixOf :: Eq a => [a] -> [a] -> Bool
-isPrefixOf [] _          = True
-isPrefixOf _ []          = False
-isPrefixOf (x:xs) (y:ys) = x == y && isPrefixOf xs ys

@@ -42,13 +42,10 @@ cleanup() {
 trap cleanup EXIT
 
 if [[ "${use_git_mode}" != "true" ]]; then
-  if [[ ! -e squealgen ]]; then
-    echo "error: non-git fallback mode requires an existing ./squealgen file to compare against" >&2
-    echo "hint: run ./mksquealgen.sh once before invoking this drift check" >&2
-    exit 2
+  if [[ -e squealgen ]]; then
+    previous_squealgen="$(mktemp)"
+    cp -p squealgen "${previous_squealgen}"
   fi
-  previous_squealgen="$(mktemp)"
-  cp -p squealgen "${previous_squealgen}"
 fi
 
 ./mksquealgen.sh
@@ -60,6 +57,9 @@ if [[ "${use_git_mode}" == "true" ]]; then
     exit 1
   fi
 else
+  if [[ -z "${previous_squealgen}" ]]; then
+    exit 0
+  fi
   was_executable="false"
   is_executable="false"
   if [[ -x "${previous_squealgen}" ]]; then

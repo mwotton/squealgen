@@ -9,7 +9,7 @@ import qualified Data.ByteString.Char8    as BS8
 import           Data.Int
 import           Data.List               (sort)
 import           Database.Postgres.Temp   (cacheConfig, withConfig, withDbCache, toConnectionString)
-import           DBHelpers               (runGeneratorFromSchema, runSession)
+import           DBHelpers               (runGeneratorFromSchema, runSession, runSquealgenScript)
 import           Functions.Public
 import qualified Generics.SOP      as SOP
 import qualified GHC.Generics      as GHC
@@ -110,12 +110,15 @@ spec = describe "Functions" $ do
         hs `shouldContain` "\"srf_composite\" ::: Function ('[  ] :=> 'ReturnsTable '[\"num\" ::: 'Null PGint8,\"label\" ::: 'Null PGtext])"
         hs `shouldContain` "\"srf_table\" ::: Function ('[ Null PGint8 ] :=> 'ReturnsTable '[\"out_num\" ::: 'Null PGint8,\"out_text\" ::: 'Null PGtext])"
         hs `shouldContain` "-- Omitted function signatures:"
-        hs `shouldContain` "-- Overload compatibility aliases not emitted:"
-        hs `shouldContain` "--   overloaded: ambiguous representable overloads (int4, int8)"
         hs `shouldContain` "-- Omitted SRF signatures:"
         hs `shouldContain` "--   legacy_alias(anyelement): pseudotype argument is not representable"
         hs `shouldContain` "--   inout_params(int8): pseudotype return is not representable"
         hs `shouldContain` "--   srf_any(anyelement): set-returning pseudotype return is not representable"
+  it "disambiguates overloaded labels when arg type names collide across schemas" $ do
+    hs <- runCrossSchemaOverloadGenerator
+    hs `shouldContain` "\"cross_schema_overloaded__one_dup_input\" ::: Function ('[ Null PGdup_input ] :=> 'Returns ( 'Null PGint8) )"
+    hs `shouldContain` "\"cross_schema_overloaded__two_dup_input\" ::: Function ('[ Null PGdup_input ] :=> 'Returns ( 'Null PGint8) )"
+    hs `shouldNotContain` "\"cross_schema_overloaded\" ::: Function"
 
 runGenerator :: IO String
 runGenerator = do
@@ -137,6 +140,29 @@ runSrfRuntimeChecks = withDbCache $ \cache -> do
     tableRes <- runSql conn "select out_num::text || ':' || out_text from srf_table(5);"
     pure (scalar, composite, tableRes)
   case result of
+    Left err -> ioError (userError (displayException err))
+    Right x  -> pure x
+
+runCrossSchemaOverloadGenerator :: IO String
+runCrossSchemaOverloadGenerator = withDbCache $ \cache -> do
+  e <- withConfig (cacheConfig cache) $ \db -> do
+    let connBS = toConnectionString db
+        conn = BS8.unpack connBS
+        setup = unlines
+          [ "create schema one;"
+          , "create schema two;"
+          , "create domain one.dup_input as int8;"
+          , "create domain two.dup_input as int8;"
+          , "create function public.cross_schema_overloaded(one.dup_input) returns int8 as $$"
+          , "  select ($1)::int8 + 1;"
+          , "$$ language sql;"
+          , "create function public.cross_schema_overloaded(two.dup_input) returns int8 as $$"
+          , "  select ($1)::int8 + 2;"
+          , "$$ language sql;"
+          ]
+    withConnection connBS $ define (UnsafeDefinition (BS8.pack setup))
+    runSquealgenScript conn "CrossSchemaOverloadGenerated" "public"
+  case e of
     Left err -> ioError (userError (displayException err))
     Right x  -> pure x
 
