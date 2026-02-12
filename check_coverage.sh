@@ -6,6 +6,14 @@ report_dir="${COVERAGE_REPORT_DIR:-coverage}"
 allowlist_file="${COVERAGE_ALLOWLIST_FILE:-coverage-allowlist.txt}"
 zero_denominator_policy="${COVERAGE_ZERO_DENOMINATOR_POLICY:-fail}"
 
+toolchain_error() {
+  echo "ERROR [coverage-toolchain]: $1" >&2
+}
+
+policy_error() {
+  echo "ERROR [coverage-policy]: $1" >&2
+}
+
 case "$zero_denominator_policy" in
   allow|fail) ;;
   *)
@@ -31,15 +39,31 @@ fi
 rm -rf "$report_dir"
 mkdir -p "$report_dir"
 
-cabal build --enable-coverage test:tests
-test_bin="$(cabal list-bin test:tests)"
+build_log="$(mktemp "$report_dir/build.XXXXXX.log")"
+if ! cabal build --enable-coverage test:tests >"$build_log" 2>&1; then
+  cat "$build_log" >&2
+  rm -f "$build_log"
+  toolchain_error "coverage-enabled build failed (cabal build --enable-coverage test:tests)"
+  exit 1
+fi
+rm -f "$build_log"
+
+list_bin_log="$(mktemp "$report_dir/list-bin.XXXXXX.log")"
+if ! test_bin="$(cabal list-bin test:tests 2>"$list_bin_log")"; then
+  cat "$list_bin_log" >&2
+  rm -f "$list_bin_log"
+  toolchain_error "unable to resolve test binary path (cabal list-bin test:tests)"
+  exit 1
+fi
+rm -f "$list_bin_log"
 latest_tix="$report_dir/tests.tix"
 test_run_log="$(mktemp "$report_dir/test-run.XXXXXX.log")"
 if ! HPCTIXFILE="$latest_tix" "$test_bin" >"$test_run_log" 2>&1; then
   cat "$test_run_log" >&2
   if grep -Fq "module mismatch with .tix/.mix file hash number" "$test_run_log"; then
-    echo "ERROR: coverage hash mismatch detected while running tests; stale HPC data is likely present. Re-running with a clean coverage directory is required." >&2
+    toolchain_error "coverage hash mismatch detected while running tests; stale HPC data is likely present. Re-running with a clean coverage directory is required."
   fi
+  toolchain_error "coverage test binary execution failed"
   exit 1
 fi
 rm -f "$test_run_log"
@@ -141,7 +165,7 @@ fi
 
 mapfile -t hpcdirs < <(find dist-newstyle -type d -name mix -path '*/hpc/*' -print | sort -u)
 if [[ "${#hpcdirs[@]}" -eq 0 ]]; then
-  echo "ERROR: no HPC mix directories found" >&2
+  toolchain_error "no HPC mix directories found"
   exit 1
 fi
 
@@ -160,8 +184,9 @@ hpc_report_log="$(mktemp "$report_dir/hpc-report.XXXXXX.log")"
 if ! hpc report "$latest_tix" --hpcdir "$combined_hpcdir" "${included_modules[@]}" >"$hpc_report_log" 2>&1; then
   cat "$hpc_report_log" >&2
   if grep -Fq "module mismatch with .tix/.mix file hash number" "$hpc_report_log"; then
-    echo "ERROR: coverage hash mismatch detected while reporting; .tix and .mix inputs are inconsistent." >&2
+    toolchain_error "coverage hash mismatch detected while reporting; .tix and .mix inputs are inconsistent."
   fi
+  toolchain_error "hpc report failed"
   exit 1
 fi
 report_output="$(cat "$hpc_report_log")"
@@ -171,7 +196,7 @@ printf '%s\n' "$report_output" | tee "$report_dir/hpc-report.txt"
 coverage_percent="$(printf '%s\n' "$report_output" | sed -n -E 's/^[[:space:]]*([0-9]+(\.[0-9]+)?)% expressions used.*/\1/p' | head -n 1)"
 coverage_line="$(printf '%s\n' "$report_output" | sed -n -E 's/^[[:space:]]*([0-9]+(\.[0-9]+)?)% expressions used[[:space:]]*\(([0-9]+)\/([0-9]+)\).*/\1 \3 \4/p' | head -n 1)"
 if [[ -z "$coverage_line" ]]; then
-  echo "ERROR: unable to parse expression coverage percentage and counts (used/total)" >&2
+  toolchain_error "unable to parse expression coverage percentage and counts (used/total)"
   exit 1
 fi
 read -r coverage_percent expressions_used expressions_total <<< "$coverage_line"
@@ -187,8 +212,9 @@ if (( line_exclusion_entries > 0 )); then
   if ! hpc show "$latest_tix" --hpcdir "$combined_hpcdir" "${included_modules[@]}" >"$hpc_show_log" 2>&1; then
     cat "$hpc_show_log" >&2
     if grep -Fq "module mismatch with .tix/.mix file hash number" "$hpc_show_log"; then
-      echo "ERROR: coverage hash mismatch detected while collecting line-level exclusions; .tix and .mix inputs are inconsistent." >&2
+      toolchain_error "coverage hash mismatch detected while collecting line-level exclusions; .tix and .mix inputs are inconsistent."
     fi
+    toolchain_error "hpc show failed while collecting line-level exclusions"
     exit 1
   fi
 
@@ -255,14 +281,14 @@ if [[ "$expressions_total" -eq 0 ]]; then
       zero_denominator_outcome="fail"
       coverage_gate_result="fail"
       coverage_percent="NA"
-      failure_message="ERROR: expression coverage denominator is zero (${expressions_used}/${expressions_total}) and policy is fail; either add measurable expression coverage scope or set COVERAGE_ZERO_DENOMINATOR_POLICY=allow for manual local runs"
+      failure_message="expression coverage denominator is zero (${expressions_used}/${expressions_total}) and policy is fail; either add measurable expression coverage scope or set COVERAGE_ZERO_DENOMINATOR_POLICY=allow for manual local runs"
       ;;
   esac
 else
   echo "Parsed expression coverage: ${coverage_percent}% (${expressions_used}/${expressions_total})"
   if ! awk -v c="$coverage_percent" -v t="$threshold" 'BEGIN { exit ((c + 0) >= (t + 0) ? 0 : 1) }'; then
     coverage_gate_result="fail"
-    failure_message="ERROR: expression coverage ${coverage_percent}% (${expressions_used}/${expressions_total}) is below threshold ${threshold}%"
+    failure_message="expression coverage ${coverage_percent}% (${expressions_used}/${expressions_total}) is below threshold ${threshold}%"
   fi
 fi
 
@@ -296,7 +322,7 @@ fi
 } > "$report_dir/summary.txt"
 
 if [[ -n "$failure_message" ]]; then
-  echo "$failure_message" >&2
+  policy_error "$failure_message"
   exit 1
 fi
 

@@ -210,8 +210,17 @@ spec = describe "check_schema/buildTestSchema scripts" $ do
     repoRoot <- getCurrentDirectory
     (exitCode, _, err, _) <- runCoverageScriptWithFakeReport repoRoot "90% expressions used (9/10)" "95"
     exitCode `shouldBe` ExitFailure 1
+    err `shouldSatisfy` ("ERROR [coverage-policy]" `isInfixOf`)
     err `shouldSatisfy` ("below threshold 95%" `isInfixOf`)
     err `shouldSatisfy` ("(9/10)" `isInfixOf`)
+
+  it "coverage gate labels coverage-enabled build failures as toolchain failures" $ do
+    repoRoot <- getCurrentDirectory
+    let extraEnv = [("FAKE_CABAL_BUILD_FAIL", "1")]
+    (exitCode, _, err, _) <- runCoverageScriptWithFakeReportEnv repoRoot "90% expressions used (9/10)" "80" extraEnv
+    exitCode `shouldBe` ExitFailure 1
+    err `shouldSatisfy` ("simulated coverage build failure" `isInfixOf`)
+    err `shouldSatisfy` ("ERROR [coverage-toolchain]" `isInfixOf`)
 
   it "coverage gate accepts decimal numeric COVERAGE_THRESHOLD values" $ do
     repoRoot <- getCurrentDirectory
@@ -397,7 +406,13 @@ runCoverageScriptWithAllowlistEnv repoRoot fakeReportLine thresholdValue allowli
     writeFile fakeCabal $ unlines
       [ "#!/usr/bin/env bash"
       , "set -euo pipefail"
-      , "if [[ \"$1\" == \"build\" ]]; then exit 0; fi"
+      , "if [[ \"$1\" == \"build\" ]]; then"
+      , "  if [[ \"${FAKE_CABAL_BUILD_FAIL:-0}\" == \"1\" ]]; then"
+      , "    echo \"simulated coverage build failure\" >&2"
+      , "    exit 12"
+      , "  fi"
+      , "  exit 0"
+      , "fi"
       , "if [[ \"$1\" == \"list-bin\" ]]; then"
       , "  printf '%s\\n' \"$FAKE_TEST_BIN\""
       , "  exit 0"
