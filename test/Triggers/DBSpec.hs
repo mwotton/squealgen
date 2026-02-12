@@ -2,6 +2,7 @@
 module Triggers.DBSpec where
 
 import           Control.Exception      (SomeException, displayException, try)
+import           Data.List              (findIndex, isPrefixOf, tails)
 import           DBHelpers              (runGeneratorFromSchema)
 import           Test.Hspec
 import           Triggers.Public        ()
@@ -26,6 +27,24 @@ spec = describe "Triggers" $ do
         hs `shouldContain` "-- Trigger fallback notes:"
         hs `shouldContain` "none"
         hs `shouldNotContain` "private_only_trigger"
+  it "orders duplicate trigger names deterministically across relations and runs" $ do
+    out1 <- runGeneratorFromSchema
+      "./test/Triggers/schemas/CollidingNames/structure.sql"
+      "Triggers.Colliding.Generated"
+      "public"
+    out2 <- runGeneratorFromSchema
+      "./test/Triggers/schemas/CollidingNames/structure.sql"
+      "Triggers.Colliding.Generated"
+      "public"
+    out1 `shouldBe` out2
+
+    let aNeedle = "\"shared_trigger\", \"CREATE TRIGGER shared_trigger BEFORE INSERT ON a_accounts FOR EACH ROW EXECUTE FUNCTION shared_trigger_a()\""
+        zNeedle = "\"shared_trigger\", \"CREATE TRIGGER shared_trigger BEFORE INSERT ON z_accounts FOR EACH ROW EXECUTE FUNCTION shared_trigger_z()\""
+        aIndex = firstIndexOf aNeedle out1
+        zIndex = firstIndexOf zNeedle out1
+    aIndex `shouldSatisfy` (/= Nothing)
+    zIndex `shouldSatisfy` (/= Nothing)
+    aIndex `shouldSatisfy` (< zIndex)
 
 runGenerator :: IO String
 runGenerator = do
@@ -34,3 +53,6 @@ runGenerator = do
   case e of
     Left err  -> ioError (userError (displayException err))
     Right out -> pure out
+
+firstIndexOf :: String -> String -> Maybe Int
+firstIndexOf needle = findIndex (isPrefixOf needle) . tails
