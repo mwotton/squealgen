@@ -2,7 +2,7 @@
 
 Generate squeal types from a running database.
 
-![CI](https://github.com/mwotton/squealgen/workflows/CI/badge.svg)
+![CI](https://github.com/mwotton/squealgen/actions/workflows/ci.yml/badge.svg)
 
 ## why?
 
@@ -25,8 +25,16 @@ on an existing database, it's tedious to have to set up the database types and k
    ```bash
    make prefix=$HOME/.local install
    ```
-3. If my database is `cooldb`, my haskell module file is `Schema.hs`, and I want to generate from the `public` schema,
+3. If my database is `cooldb`, my Haskell module is `Schema` (file `Schema.hs`), and I want to generate from the `public` schema,
    I would run `squealgen cooldb Schema public > ~/myproject/src/Schema.hs`.
+
+   Notes:
+
+   - `DBNAME` is passed to `psql -d`, so it can be a database name *or* a libpq connection string/URL.
+   - `MODULENAME` is the Haskell module name (not a file path).
+   - `IMPORTS` (optional) is inserted into the generated module; a convenient pattern is `"... $(cat extra_imports.txt)"`.
+   - `PSQLCMD` can be set to use a non-default `psql` binary.
+
    `SCHEMA` is treated as a comma-separated `search_path` fragment, so you can pass `public,ext` if you also need `ext` on the path (e.g. for extension-owned types).
 
 You could integrate this in various ways: perhaps just as an initial scaffold, or perhaps integrated as part
@@ -35,7 +43,7 @@ prone to failing (for instance, better never compile any code if you don't have 
 of psql or a way of spinning up an empty database.)
 
 I highly recommend having a scripted way to bring up a temporary database and run all migrations first. I use
-Jonathan Fischoff's [tmp-postgres](https://hackage.haskell.org/package/tmp-postgres-1.34.1.0) library and
+Jonathan Fischoff's [tmp-postgres](https://hackage.haskell.org/package/tmp-postgres) library and
 recommend it if you're running migrations through Haskell.
 
 ## hacking?
@@ -73,12 +81,10 @@ Function-overload compatibility notes:
 
 ## you'll need
 
-- `initdb` from postgresql to be in your PATH. It typically isn't on Ubuntu systems, at least: usually in /usr/lib/postgresql/$VERSION_NUMBER/bin.
-- pg_tmp from here: https://eradman.com/ephemeralpg/code/ephemeralpg-3.0.tar.gz
+- PostgreSQL client/server tools on your `PATH`: `psql`, `initdb`, `pg_ctl`, `createdb` (used by tests and vendored `vendor/pg_tmp`). On Ubuntu, these are often under `/usr/lib/postgresql/<version>/bin` (e.g. `/usr/lib/postgresql/16/bin`); if `pg_config` is available: `export PATH="$(pg_config --bindir):$PATH"`.
 - make
 - cabal-install
-
-
+- `inotifywait` (from `inotify-tools`) if you want to use `make testwatch`.
 
 ## what next?
 
