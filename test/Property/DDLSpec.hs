@@ -61,6 +61,7 @@ testTree = localOption (NumThreads 1) $ testGroup "Property.DDL"
   [ testProperty "DDL generator produces squeal schemas that compile" ddlProperty
   , testProperty "Generated module fails when invalid code is appended" ddlInvalidAppendProperty
   , testProperty "Large schema (500 tables) compiles within 30s" ddlLargeSchemaCompilesQuickly
+  , testProperty "Long function names near identifier limit compile" ddlLongFunctionNamesProperty
   ]
 
 ddlProperty :: Property ()
@@ -215,6 +216,47 @@ ddlLargeSchemaCompilesQuickly = do
   case unsafePerformIO (compileLargeSchemaWithin schema timeoutSeconds) of
     Left err -> testFailed ("large schema compile failed or timed out: " <> err)
     Right () -> pure ()
+
+-- Property: long function names near PostgreSQL identifier limit (63 bytes) compile correctly
+-- PostgreSQL NAMEDATALEN is 64, so max identifier length is 63 bytes.
+-- This tests that disambiguated labels (funcname__argtype) work near this limit.
+--
+-- Note: This test documents current behavior. PostgreSQL will truncate identifiers
+-- longer than 63 bytes during CREATE FUNCTION, and squealgen will emit what it finds
+-- in pg_catalog. The test verifies compilation succeeds for names in the 55-63 char range.
+ddlLongFunctionNamesProperty :: Property ()
+ddlLongFunctionNamesProperty = do
+  -- Generate a base name length between 55-63 chars (near the 63-byte limit)
+  baseLen <- gen $ Gen.int (Range.between (55, 63))
+  -- Use a single deterministic schema to keep test runtime reasonable
+  let schema = longFunctionNameSchema baseLen
+  traceIf ("--- Testing long function names with base length " <> show baseLen <> " ---")
+  case unsafePerformIO (checkSchema schema) of
+    Left err -> do
+      traceIf "--- Long function name schema failed ---"
+      traceIf err
+      testFailed ("long function name schema failed to compile: " <> err)
+    Right moduleSource -> do
+      traceIf "--- Long function name schema compiled successfully ---"
+      traceIf moduleSource
+      pure ()
+
+-- | Create a schema with long function names that trigger disambiguation.
+-- Creates overloaded functions with different argument types to force
+-- squealgen to emit disambiguated labels (name__argtype).
+longFunctionNameSchema :: Int -> SchemaDDL
+longFunctionNameSchema baseLen =
+  let -- Generate a base name of exactly baseLen characters using alphabetic chars
+      -- Using 'a' repeated ensures we get a valid SQL identifier
+      baseName = replicate baseLen 'a'
+      -- Create overloaded functions with int4 and int8 arguments
+      -- These will get disambiguated labels like: aaa...__int4, aaa...__int8
+      func1 = "CREATE FUNCTION " <> baseName <> "(x int4) RETURNS int4 AS 'SELECT x' LANGUAGE sql;"
+      func2 = "CREATE FUNCTION " <> baseName <> "(x int8) RETURNS int8 AS 'SELECT x' LANGUAGE sql;"
+      -- Also add a table to make the schema non-empty
+      table = "CREATE TABLE test_table (id SERIAL PRIMARY KEY);"
+      ddl = table <> "\n" <> func1 <> "\n" <> func2 <> "\n"
+  in SchemaDDL ddl
 
 compileLargeSchemaWithin :: SchemaDDL -> Int -> IO (Either String ())
 compileLargeSchemaWithin schema timeoutSeconds = fmap (either (Left . displayException) id) . try @SomeException $ do
