@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 28b09601cf66103c6ae2d07a3cdc890776b1cbbab2b430c94951e3426dda6abc
+-- hash: 538f841975036e6035b1dc27b4611c2bc7ccf735c7acea6790dcee38d4135670
 
 name:           squealgen
 version:        0.2.0.0
@@ -37,8 +37,8 @@ executable squealgen
   hs-source-dirs:
       app
   build-depends:
-      base >=4.7
-    , process
+      base >=4.7 && <5
+    , process >=1.6 && <2
   default-language: Haskell2010
 
 test-suite tests
@@ -58,7 +58,7 @@ test-suite tests
       TypeOperators
       GADTs
   build-depends:
-      base >=4.7
+      base >=4.7 && <5
     , bytestring
     , containers
     , directory

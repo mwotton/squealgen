@@ -18,7 +18,7 @@ category:            Database
 description:         Please see the README on GitHub at <https://github.com/mwotton/squealgen#readme>
 
 dependencies:
-- base >= 4.7
+- base >= 4.7 && < 5
 
 data-files:
 - squealgen.sql
@@ -28,7 +28,7 @@ executables:
     main: Main.hs
     source-dirs: app
     dependencies:
-    - process
+    - process >= 1.6 && < 2
 
 tests:
   tests:
