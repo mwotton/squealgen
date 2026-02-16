@@ -91,3 +91,113 @@ Function-overload compatibility notes:
 - Remove string-hacking, generate in a more principled way.
 - Improve function-label ergonomics while preserving overload safety and readability.
 - Investigate richer type-level trigger/check representations while preserving current metadata fallback behavior.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              squealgen flow                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ┌──────────────┐    ┌────────────────┐    ┌──────────────────────────┐   │
+│   │ PostgreSQL   │    │ squealgen.sql  │    │ Generated Schema.hs      │   │
+│   │ Database     │───▶│ (psql script)  │───▶│ (Squeal types)           │   │
+│   │              │    │                │    │                          │   │
+│   │ - tables     │    │ - CTE queries  │    │ - type DB                │   │
+│   │ - views      │    │ - type mapping │    │ - type Schema            │   │
+│   │ - enums      │    │ - emit logic   │    │ - type Tables/Views/...  │   │
+│   │ - functions  │    │                │    │ - function definitions   │   │
+│   └──────────────┘    └────────────────┘    └──────────────────────────┘   │
+│                                                                             │
+│   Input: DBNAME, MODULENAME, SCHEMA                                         │
+│   Output: Haskell module with Squeal type definitions                      │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+The generator queries PostgreSQL system catalogs (`pg_catalog`, `information_schema`) to extract schema metadata, then emits Haskell type definitions compatible with Squeal's type-level DSL.
+
+## Type Mappings
+
+| PostgreSQL Type | Squeal Type |
+|-----------------|-------------|
+| `boolean` | `PGbool` |
+| `int2` / `smallint` | `PGint2` |
+| `int4` / `integer` | `PGint4` |
+| `int8` / `bigint` | `PGint8` |
+| `float4` / `real` | `PGfloat4` |
+| `float8` / `double precision` | `PGfloat8` |
+| `numeric` | `PGnumeric` |
+| `text` | `PGtext` |
+| `varchar` | `PGtext` or `(PGvarchar n)` |
+| `char` | `PGchar` or `(PGvarchar n)` |
+| `bytea` | `PGbytea` |
+| `date` | `PGdate` |
+| `time` | `PGtime` |
+| `timestamp` | `PGtimestamp` |
+| `timestamptz` | `PGtimestamptz` |
+| `interval` | `PGinterval` |
+| `uuid` | `PGuuid` |
+| `inet` | `PGinet` |
+| `json` | `PGjson` |
+| `jsonb` | `PGjsonb` |
+| `oid` | `PGoid` |
+| `array[]` | `(PGvararray ...)` |
+| `enum` | `'PGenum '["label1", "label2", ...]` |
+| `composite` | `'PGcomposite '[...]` |
+| `domain` | Alias to base type |
+
+**Extension types** (ltree, hstore, etc.) are emitted as `UnsafePGType "typename"` aliases.
+
+## Troubleshooting
+
+### "squealgen drift detected"
+
+Run `./mksquealgen.sh` to regenerate the `squealgen` script from `squealgen.sql`, then commit both files. The CI enforces that these stay in sync.
+
+### "initdb: command not found"
+
+PostgreSQL binaries may not be on your PATH. On Ubuntu, try:
+
+```bash
+export PATH="/usr/lib/postgresql/$(ls /usr/lib/postgresql | tail -1)/bin:$PATH"
+```
+
+Or use `pg_config`:
+
+```bash
+export PATH="$(pg_config --bindir):$PATH"
+```
+
+### Generated code doesn't compile
+
+1. Ensure you're using compatible versions of `squeal-postgresql` and GHC.
+2. Check for pseudotype arguments/returns in functions - these are omitted with a comment.
+3. Extension types require `UnsafePGType` - ensure extensions are installed in the database.
+
+### Functions are omitted from output
+
+Functions with pseudotype arguments (e.g., `anyelement`) or returns are not representable in Squeal's type system. Check the generated output for comments like:
+
+```haskell
+-- Omitted function signatures:
+--   my_func(anyelement): pseudotype argument is not representable
+```
+
+### "Croaked: chosen_schema is empty"
+
+The schema argument is required. Provide a valid schema name:
+
+```bash
+squealgen mydb MySchema public > Schema.hs
+```
+
+### Multiple schemas / extensions
+
+Use comma-separated search_path for extensions:
+
+```bash
+squealgen mydb MySchema public,extensions > Schema.hs
+```
+
+Types are generated only for the first schema (`public`), but extension-owned types referenced by it will emit `UnsafePGType` aliases.
