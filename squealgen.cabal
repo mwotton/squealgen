@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 98ab55854935c5b36b5e44bfdc7886a8ccf285476a49270f66835790a99be0c8
+-- hash: 7e720616e420d16e4e254f628ae80f650b18f3503edc4ce5487d61982e397e27
 
 name:           squealgen
-version:        0.1.0.0
+version:        2.0.0
 synopsis:       generate squeal types from an existing database
 description:    Please see the README on GitHub at <https://github.com/mwotton/squealgen#readme>
 category:       Database
@@ -45,47 +45,8 @@ test-suite tests
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Arrays.DBSpec
-      Arrays.Public
-      Basic.DBSpec
-      Basic.Public
-      Checks.DBSpec
-      Checks.Public
-      CheckSchemaScript.DBSpec
-      ComplexPrimary.DBSpec
-      ComplexPrimary.Public
-      CompositeForeignKeys.DBSpec
-      CompositeForeignKeys.Public
-      Composites.DBSpec
-      Composites.Public
-      CrossSchemaEnumComposites.DBSpec
-      CrossSchemaEnums.DBSpec
-      DBHelpers
-      Domains.DBSpec
-      Domains.Public
-      Enums.DBSpec
-      Enums.Public
-      Extensions.DBSpec
-      Extensions.Public
-      ForeignKeyReferencedColumns.DBSpec
-      ForeignKeyReferencedColumns.Public
-      Functions.DBSpec
-      Functions.Public
-      InetArrays.DBSpec
-      InetArrays.Public
-      Members.DBSpec
-      Members.Public
-      NoConstraints.DBSpec
-      NoConstraints.Public
-      PgCatalog.DBSpec
-      Property.DDLHarnessSpec
-      Property.DDLSpec
-      SearchPathFragments.DBSpec
-      Triggers.DBSpec
-      Triggers.Public
-      Views.DBSpec
-      Views.Public
-      Paths_squealgen
+      EmptySchema.DBSpec
+      EmptySchema.Public
   hs-source-dirs:
       test
   default-extensions:
