@@ -88,6 +88,7 @@ select set_config('search_path', :'safe_search_path', false) \gset
 \echo -- | Generation parameters:
 \echo -- |   Schema: :primary_schema
 \echo -- |   Module: :modulename
+\echo -- |   Version: :squealgen_version
 \echo -- | 
 \echo -- | Edit if you know how it got made and are willing to own it now.
 

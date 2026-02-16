@@ -10,7 +10,8 @@ MODULENAME=$2
 SCHEMA=$3
 IMPORTS=$4 # this can be empty.
 PSQLCMD=${PSQLCMD:-psql}
-$PSQLCMD -X -d "${DBNAME}" -v chosen_schema="${SCHEMA}" -v modulename="${MODULENAME}" -v extra_imports="${IMPORTS}" <<"EOF"
+version='2.0.0'
+$PSQLCMD -X -d "${DBNAME}" -v chosen_schema="${SCHEMA}" -v modulename="${MODULENAME}" -v extra_imports="${IMPORTS}" -v squealgen_version="${version}" <<"EOF"
 \set QUIET
 \set ON_ERROR_STOP true
 
@@ -101,6 +102,7 @@ select set_config('search_path', :'safe_search_path', false) \gset
 \echo -- | Generation parameters:
 \echo -- |   Schema: :primary_schema
 \echo -- |   Module: :modulename
+\echo -- |   Version: :squealgen_version
 \echo -- | 
 \echo -- | Edit if you know how it got made and are willing to own it now.
 

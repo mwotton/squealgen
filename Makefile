@@ -1,3 +1,18 @@
+# =============================================================================
+# squealgen Makefile
+# =============================================================================
+#
+# Validation contract:
+#   - `make test`: Local development validation (drift check + full test suite)
+#   - `make ci`: CI validation (drift check + reduced property tests for runtime)
+#
+# Note: There is no coverage gate. Coverage is not meaningful for this project
+# because the core logic is in squealgen.sql (a psql script), not Haskell code.
+# The Haskell test suite exercises the generator, but measuring line coverage
+# of test harness code doesn't reflect generator correctness.
+#
+# =============================================================================
+
 testTargets := $(subst /schemas,,$(patsubst %/structure.sql,%.hs,$(wildcard test/*/schemas/*/structure.sql)))
 
 squealgen: squealgen.sql mksquealgen.sh
