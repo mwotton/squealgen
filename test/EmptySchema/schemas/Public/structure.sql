@@ -1,0 +1,11 @@
+-- Empty schema: no tables, views, enums, functions, or composites
+-- This tests that squealgen handles empty schemas correctly.
+--
+-- Edge cases NOT covered by this fixture:
+--   - Schema with only dropped columns (attnum < 0 or attisdropped)
+--   - Schema with only system catalogs (pg_catalog.xxx)
+--   - Schema with only domains but no tables
+--   - Schema with only extension-owned types
+--
+-- If you add tests for these edge cases, create new fixtures rather than
+-- modifying this one, to keep the "empty" semantics clear.

@@ -1,0 +1,16 @@
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Lock files
+*.lock
+
+# Temporary
+last-touched
+*.tmp
+
+# br local state
+.br_history/
+.local_version
+daemon.log

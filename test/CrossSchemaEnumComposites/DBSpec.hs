@@ -3,10 +3,8 @@ module CrossSchemaEnumComposites.DBSpec where
 
 import           Control.Exception        (SomeException, displayException, try)
 import qualified Data.ByteString.Char8    as BS8
+import           DBHelpers                (runSquealgenScript)
 import           Database.Postgres.Temp
-import           System.Exit              (ExitCode (..))
-import           System.IO                as IO
-import           System.Process           (proc, readCreateProcessWithExitCode)
 import           Test.Hspec
 import           Squeal.PostgreSQL        (define, withConnection, Definition (UnsafeDefinition))
 
@@ -34,24 +32,7 @@ run = withDbCache $ \cache -> do
           , "CREATE TYPE one.composite_thing AS ( status two.traffic_light );"
           ]
     withConnection connBS $ define (UnsafeDefinition (BS8.pack setup))
-    runSquealgen (BS8.unpack connBS) "CrossSchemaCompositeGenerated" "one"
+    runSquealgenScript (BS8.unpack connBS) "CrossSchemaCompositeGenerated" "one"
   case e of
     Left err -> ioError (userError (displayException err))
     Right x  -> pure x
-
-runSquealgen :: String -> String -> String -> IO String
-runSquealgen conn moduleName' chosen = do
-  script <- IO.readFile "squealgen.sql"
-  let cmd = proc "psql"
-        [ "-X"
-        , "-q"
-        , "-v", "chosen_schema=" <> chosen
-        , "-v", "modulename=" <> moduleName'
-        , "-v", "extra_imports="
-        , "-d", conn
-        ]
-  (exitCode, out, err) <- readCreateProcessWithExitCode cmd script
-  case exitCode of
-    ExitSuccess   -> pure out
-    ExitFailure c -> ioError (userError (unlines ["psql exited with code " <> show c, err]))
-

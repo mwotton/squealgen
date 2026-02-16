@@ -8,10 +8,11 @@ import qualified Generics.SOP as SOP
 import qualified GHC.Generics as GHC
 import Test.Hspec
 import InetArrays.Public
+import DBHelpers (runSession)
 import Squeal.PostgreSQL
-import Data.Text
-import Data.Set
+import qualified Data.ByteString.Char8 as BS8
 import Data.IP (IPRange)
+import Text.Read (readMaybe)
 
 data AddressSets = AddressSets { addresses :: [IPRange] }
   deriving stock (Show, GHC.Generic, Eq)
@@ -22,6 +23,11 @@ getFoos = Query nilParams (AddressSets . getVarArray <$> #addresses)
           $ select_ #addresses (from $ table #address_sets)
 
 spec = describe "Arrays" $ do
-  it "compiles" $ do
-    -- nothing to do on an empty database
-    'a' `shouldBe` 'a'
+  it "round-trips inet arrays via runtime query" $ do
+    expected <- case readMaybe "192.168.0.0/24" of
+      Just r -> pure [AddressSets [r]]
+      Nothing -> expectationFailure "failed to parse expected IP range literal" >> pure []
+    runSession "InetArrays" "Public" (do
+      define $ UnsafeDefinition (BS8.pack "INSERT INTO address_sets(addresses) VALUES (ARRAY['192.168.0.0/24']::inet[]);")
+      getRows =<< execute getFoos)
+      `shouldReturn` expected
