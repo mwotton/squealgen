@@ -1,6 +1,27 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE TypeApplications #-}
 
+-- |
+-- Module      : Property.DDLSpec
+-- Description : Property-based tests for DDL schema generation
+--
+-- == unsafePerformIO Usage
+--
+-- This module uses 'unsafePerformIO' in two places, which requires justification:
+--
+-- 1. @traceEnabled@: Reads the @SQUEALGEN_TEST_TRACE@ environment variable at module
+--    load time to enable optional debug tracing. This is safe because:
+--    * It is run once at module load (due to NOINLINE pragma)
+--    * The result is a pure 'Bool' after initial evaluation
+--    * Environment variable lookup is idempotent with no side effects
+--
+-- 2. @checkSchema@ and @compileModule@: Called via 'unsafePerformIO' in property
+--    test bodies. This is safe because:
+--    * The property test framework ('Test.Tasty.Falsify') expects pure test bodies
+--    * Each invocation creates isolated temporary resources (databases, files)
+--    * The IO is fully contained within each test case
+--    * Failures are captured as 'Either' results, not thrown as exceptions
+--    * Tests are run sequentially (NumThreads 1) to avoid resource contention
 module Property.DDLSpec
   ( testTree
   , SchemaDDL (..)

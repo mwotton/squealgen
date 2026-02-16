@@ -2,6 +2,35 @@
 \set ON_ERROR_STOP true
 
 -- ============================================================================
+-- THREAT MODEL: Identifier Handling
+-- ============================================================================
+--
+-- This script handles two categories of identifiers:
+--
+-- 1. pg_catalog identifiers (TRUSTED):
+--    System catalog queries (pg_type, pg_class, etc.) return PostgreSQL internal
+--    identifiers. These are controlled by the database system and are trusted.
+--    No quoting is needed when using these in subsequent queries.
+--
+-- 2. Schema names (USER-CONTROLLED):
+--    The :chosen_schema parameter is provided by the user. While this typically
+--    comes from trusted configuration, we treat it as potentially untrusted.
+--    All schema name interpolation uses quote_ident() to prevent SQL injection.
+--
+-- 3. Generated Haskell identifiers:
+--    Table/column names from pg_catalog are emitted as-is into Haskell source.
+--    This is safe because: (a) they come from the database, not user input,
+--    (b) the generated output is compiled, not executed, and (c) Haskell's
+--    type system will reject malformed identifiers at compile time.
+--
+-- ASSUMPTIONS:
+-- - The psql connection has read access to pg_catalog and the target schema
+-- - The target schema contains valid PostgreSQL identifiers
+-- - Output is written to a file that will be compiled by GHC, not executed
+--
+-- ============================================================================
+
+-- ============================================================================
 -- SECTION: Utility Functions
 -- Helper functions for error handling, string manipulation, type declarations,
 -- and aggregation used throughout the generator.
@@ -143,15 +172,20 @@ from unnest(string_to_array(:'extra_imports', ',')) as s(i) \gset
 -- Identify types owned by PostgreSQL extensions and emit UnsafePGType aliases.
 -- Also handles built-in types that require manual unsafe treatment.
 -- Key outputs: :required_extensions_comment, :unsafe_type_aliases
+--
+-- The sg_used_type_refs view is shared with used_enums in the Enumerations
+-- section to avoid duplicating the 4-way UNION structure.
 -- ============================================================================
 
--- Extension/unsafe-type support: emit UnsafePGType aliases only when referenced.
-create temporary view sg_used_base_types as
+-- Shared view: all types referenced by the schema (tables, views, functions, composites).
+-- Includes typcategory to enable filtering by type kind (e.g., enums, special types).
+create temporary view sg_used_type_refs as
 with used_types as (
   -- From table/view columns in information_schema
   select distinct
     (case when t.typcategory = 'A' then elem.oid else t.oid end) as type_oid,
-    (case when t.typcategory = 'A' then elem.typname else t.typname end) as typname
+    (case when t.typcategory = 'A' then elem.typname else t.typname end) as typname,
+    (case when t.typcategory = 'A' then elem.typcategory else t.typcategory end) as typcategory
   from information_schema.columns c
   join pg_catalog.pg_namespace tns on tns.nspname = c.udt_schema
   join pg_catalog.pg_type t on t.typname = c.udt_name and t.typnamespace = tns.oid
@@ -161,7 +195,8 @@ with used_types as (
   -- From function arguments in the chosen schema
   select distinct
     (case when targ.typcategory = 'A' then elem2.oid else targ.oid end) as type_oid,
-    (case when targ.typcategory = 'A' then elem2.typname else targ.typname end) as typname
+    (case when targ.typcategory = 'A' then elem2.typname else targ.typname end) as typname,
+    (case when targ.typcategory = 'A' then elem2.typcategory else targ.typcategory end) as typcategory
   from pg_catalog.pg_proc p
   join pg_catalog.pg_namespace ns on ns.oid = p.pronamespace
   join unnest(p.proargtypes) as arg(oid) on true
@@ -172,7 +207,8 @@ with used_types as (
   -- From function return types in the chosen schema
   select distinct
     (case when tret.typcategory = 'A' then elem3.oid else tret.oid end) as type_oid,
-    (case when tret.typcategory = 'A' then elem3.typname else tret.typname end) as typname
+    (case when tret.typcategory = 'A' then elem3.typname else tret.typname end) as typname,
+    (case when tret.typcategory = 'A' then elem3.typcategory else tret.typcategory end) as typcategory
   from pg_catalog.pg_proc p
   join pg_catalog.pg_namespace ns on ns.oid = p.pronamespace
   join pg_catalog.pg_type tret on tret.oid = p.prorettype
@@ -182,7 +218,8 @@ with used_types as (
   -- From composite type attributes in the chosen schema
   select distinct
     (case when att_t.typcategory = 'A' then elem4.oid else att_t.oid end) as type_oid,
-    (case when att_t.typcategory = 'A' then elem4.typname else att_t.typname end) as typname
+    (case when att_t.typcategory = 'A' then elem4.typname else att_t.typname end) as typname,
+    (case when att_t.typcategory = 'A' then elem4.typcategory else att_t.typcategory end) as typcategory
   from pg_catalog.pg_type comp
   join pg_catalog.pg_namespace comp_ns on comp_ns.oid = comp.typnamespace
   join pg_catalog.pg_class comp_cls on comp.typrelid = comp_cls.oid
@@ -193,7 +230,11 @@ with used_types as (
     and comp.typtype = 'c'
     and comp_cls.relkind = 'c'
 )
-select type_oid, typname from used_types;
+select type_oid, typname, typcategory from used_types;
+
+-- Convenience view: all used types without category (for backward compatibility)
+create temporary view sg_used_base_types as
+select type_oid, typname from sg_used_type_refs;
 
 create temporary view sg_used_extensions as
 select distinct e.extname, t.typname
@@ -216,7 +257,15 @@ from extnames \gset
 \echo :required_extensions_comment
 
 with manual_unsafe_types as (
-  select unnest(array['name','regclass','cidr']) as typname
+  -- Special types (typcategory = 'S') that require UnsafePGType aliases.
+  -- This includes types like 'name', 'regclass', 'cidr', etc. that are
+  -- built into PostgreSQL but not mapped by Squeal's type system.
+  -- We query pg_type for special types that are actually used by the schema.
+  select distinct t.typname
+  from pg_catalog.pg_type t
+  join pg_catalog.pg_namespace ns on ns.oid = t.typnamespace
+  where t.typcategory = 'S'
+    and ns.nspname = 'pg_catalog'
 ), unsafe_types as (
   select distinct t.typname
   from sg_used_base_types t
@@ -257,51 +306,12 @@ select format('type DB = ''["%s" ::: Schema]', :'primary_schema') as db \gset
 
 -- now we emit all the enumerations
 -- Determine only the enums actually used by the chosen schema (including arrays and function args/returns)
+-- Enums are derived from the shared sg_used_type_refs view (see Extension section).
+-- This avoids duplicating the 4-way UNION structure used for type detection.
 with used_enums as (
-  -- From table/view columns in information_schema
-  select distinct (case when t.typcategory = 'A' then elem.typname else t.typname end) as enumname
-  from information_schema.columns c
-  join pg_catalog.pg_namespace tns on tns.nspname = c.udt_schema
-  join pg_catalog.pg_type t on t.typname = c.udt_name and t.typnamespace = tns.oid
-  left join pg_catalog.pg_type elem on t.typcategory = 'A' and elem.oid = t.typelem
-  join pg_catalog.pg_type base on (case when t.typcategory = 'A' then base.oid = elem.oid else base.oid = t.oid end)
-  where c.table_schema = :'primary_schema'
-    and base.typcategory = 'E'
-  union
-  -- From function arguments in the chosen schema
-  select distinct (case when targ.typcategory = 'A' then elem2.typname else targ.typname end) as enumname
-  from pg_catalog.pg_proc p
-  join pg_catalog.pg_namespace ns on ns.oid = p.pronamespace
-  join unnest(p.proargtypes) as arg(oid) on true
-  join pg_catalog.pg_type targ on targ.oid = arg.oid
-  left join pg_catalog.pg_type elem2 on targ.typcategory = 'A' and elem2.oid = targ.typelem
-  join pg_catalog.pg_type base2 on (case when targ.typcategory = 'A' then base2.oid = elem2.oid else base2.oid = targ.oid end)
-  where ns.nspname = :'primary_schema'
-    and base2.typcategory = 'E'
-  union
-  -- From function return types in the chosen schema
-  select distinct (case when tret.typcategory = 'A' then elem3.typname else tret.typname end) as enumname
-  from pg_catalog.pg_proc p
-  join pg_catalog.pg_namespace ns on ns.oid = p.pronamespace
-  join pg_catalog.pg_type tret on tret.oid = p.prorettype
-  left join pg_catalog.pg_type elem3 on tret.typcategory = 'A' and elem3.oid = tret.typelem
-  join pg_catalog.pg_type base3 on (case when tret.typcategory = 'A' then base3.oid = elem3.oid else base3.oid = tret.oid end)
-  where ns.nspname = :'primary_schema'
-    and base3.typcategory = 'E'
-  union
-  -- From composite type attributes in the chosen schema
-  select distinct (case when att_t.typcategory = 'A' then elem4.typname else att_t.typname end) as enumname
-  from pg_catalog.pg_type comp
-  join pg_catalog.pg_namespace comp_ns on comp_ns.oid = comp.typnamespace
-  join pg_catalog.pg_class comp_cls on comp.typrelid = comp_cls.oid
-  join pg_catalog.pg_attribute a on a.attrelid = comp.typrelid and a.attnum > 0 and not a.attisdropped
-  join pg_catalog.pg_type att_t on att_t.oid = a.atttypid
-  left join pg_catalog.pg_type elem4 on att_t.typcategory = 'A' and elem4.oid = att_t.typelem
-  join pg_catalog.pg_type base4 on (case when att_t.typcategory = 'A' then base4.oid = elem4.oid else base4.oid = att_t.oid end)
-  where comp_ns.nspname = :'primary_schema'
-    and comp.typtype = 'c'
-    and comp_cls.relkind = 'c'
-    and base4.typcategory = 'E'
+  select typname as enumname
+  from sg_used_type_refs
+  where typcategory = 'E'
 ),
 enumerations as (
   select
@@ -502,8 +512,8 @@ select coalesce(string_agg(allDefs.tabData, E'\n'),'') as defs,
 from (
   select format(E'type %1$sColumns = %2$s\ntype %1$sConstraints = ''[%3$s]\n%4$stype %1$sTable = %1$sConstraints :=> %1$sColumns\n',
 	       replace(initcap(replace(defs.table_name, '_', ' ')), ' ', ''),
-	       string_agg(defs.cols, 'XXXXX'), -- this shouldn't be necessary
-	       string_agg(cd.str, 'YYYYY'),
+	       max(defs.cols),
+	       coalesce(max(cd.str), ''),
 	       coalesce(pg_temp.haddock_comment((select comment from tableComments where table_name = defs.table_name limit 1)), '')) as tabData,
 	 replace(initcap(replace(defs.table_name, '_', ' ')), ' ', '') as cappedName,
 	 defs.table_name

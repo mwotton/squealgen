@@ -11,6 +11,7 @@ import qualified ComplexPrimary.DBSpec
 import qualified CompositeForeignKeys.DBSpec
 import qualified Composites.DBSpec
 import qualified Domains.DBSpec
+import qualified EmptySchema.DBSpec
 import qualified Enums.DBSpec
 import qualified CrossSchemaEnums.DBSpec
 import qualified CrossSchemaEnumComposites.DBSpec
@@ -39,6 +40,7 @@ main = do
     , testSpec "CompositeForeignKeys.DB" CompositeForeignKeys.DBSpec.spec
     , testSpec "Composites.DB" Composites.DBSpec.spec
     , testSpec "Domains.DB" Domains.DBSpec.spec
+    , testSpec "EmptySchema.DB" EmptySchema.DBSpec.spec
     , testSpec "Enums.DB" Enums.DBSpec.spec
     , testSpec "CrossSchemaEnums.DB" CrossSchemaEnums.DBSpec.spec
     , testSpec "CrossSchemaEnumComposites.DB" CrossSchemaEnumComposites.DBSpec.spec

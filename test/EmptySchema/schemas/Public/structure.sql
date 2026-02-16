@@ -1,0 +1,2 @@
+-- Empty schema: no tables, views, enums, functions, or composites
+-- This tests that squealgen handles empty schemas correctly

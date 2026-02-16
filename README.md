@@ -4,6 +4,43 @@ Generate squeal types from a running database.
 
 ![CI](https://github.com/mwotton/squealgen/actions/workflows/ci.yml/badge.svg)
 
+## Breaking Changes (v2.0.0)
+
+### Overloaded Function Naming
+
+Starting with v2.0.0, overloaded PostgreSQL functions now use **disambiguated labels** to ensure type-safe calling:
+
+```haskell
+-- Old (v1.x): Only one overload could be represented, using simple name
+type Functions = '[ "my_func" ::: Function ... ]
+
+-- New (v2.0): All representable overloads use disambiguated labels
+type Functions = '[ "my_func__int4" ::: Function '[Null PGint4] :=> ...
+                  , "my_func__int8" ::: Function '[Null PGint8] :=> ... ]
+```
+
+**Migration Guide:**
+
+1. **Search for simple function names** in your codebase that may have been overloaded:
+   ```bash
+   # Find usages of function labels in your code
+   grep -r '#"my_func"' src/
+   ```
+
+2. **Replace with disambiguated labels**:
+   - Before: `#"my_func"` → After: `#"my_func__int4"` or `#"my_func__int8"` (as appropriate)
+
+3. **Compatibility aliases**: If only ONE overload of a function is representable (others have pseudotype arguments), a compatibility alias is emitted:
+   ```haskell
+   -- Both labels work when only one overload is representable:
+   type Functions = '[ "legacy_func" ::: Function ...      -- compatibility alias
+                     , "legacy_func__int8" ::: Function ... -- disambiguated label
+                     ]
+   ```
+   In this case, existing code using the simple name will continue to work.
+
+4. **Pseudotype functions** (using `anyelement`, `anyarray`, etc.) are not representable and are omitted with a comment—this behavior is unchanged.
+
 ## why?
 
 [Squeal](https://hackage.haskell.org/package/squeal-postgresql) is a lovely way to interact with a database, but setting up the initial schema is a struggle.
@@ -116,6 +153,22 @@ Function-overload compatibility notes:
 ```
 
 The generator queries PostgreSQL system catalogs (`pg_catalog`, `information_schema`) to extract schema metadata, then emits Haskell type definitions compatible with Squeal's type-level DSL.
+
+### Triggers Metadata
+
+The generated output includes a `Triggers` type that provides metadata about PostgreSQL triggers defined on tables in the schema:
+
+```haskell
+-- Example generated output:
+-- triggers
+-- Trigger contract: Triggers is generated metadata and is not composed into Schema.
+type Triggers = 
+  '[ "users_insert_trigger" ::: 'TriggerMetadata
+       '["table" ::: "users", "event" ::: "INSERT", "timing" ::: "BEFORE"]
+   ]
+```
+
+**Important**: The `Triggers` type is **metadata-only** and is NOT composed into the `Schema` type. It cannot be used in Squeal queries. Its purpose is to document what triggers exist in the database for developer reference. Squeal does not provide type-level trigger support.
 
 ## Type Mappings
 
