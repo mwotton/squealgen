@@ -3,6 +3,7 @@
 -- | Generation parameters:
 -- | Schema: public
 -- | Module: ComplexPrimary.Public
+-- | Version: 2.0.0
 -- |
 -- | Edit if you know how it got made and are willing to own it now.
 {-# LANGUAGE DataKinds #-}
