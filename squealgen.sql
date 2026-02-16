@@ -3,6 +3,12 @@
 
 \echo -- | This code was originally created by squealgen. Edit if you know how it got made and are willing to own it now.
 
+-- ============================================================================
+-- SECTION: Utility Functions
+-- Helper functions for error handling, string manipulation, type declarations,
+-- and aggregation used throughout the generator.
+-- ============================================================================
+
 create or replace function pg_temp.croak(message text) returns text as $$
 begin
   raise 'Croaked: %', message;
@@ -99,6 +105,12 @@ CREATE AGGREGATE pg_temp.FIRST (
 	stype    = anyelement
 );
 
+-- ============================================================================
+-- SECTION: Haskell Module Header
+-- Emit language pragmas, module declaration, and imports for the generated
+-- Squeal schema module.
+-- ============================================================================
+
 -- PRAGMAS of DOOM
 \echo {-# LANGUAGE DataKinds #-}
 \echo {-# LANGUAGE DeriveGeneric #-}
@@ -119,6 +131,13 @@ select coalesce(string_agg(format('import %s', s.i)  , E'\n'), '') as imports
 from unnest(string_to_array(:'extra_imports', ',')) as s(i) \gset
 \echo :imports
 
+
+-- ============================================================================
+-- SECTION: Extension and Unsafe Type Detection
+-- Identify types owned by PostgreSQL extensions and emit UnsafePGType aliases.
+-- Also handles built-in types that require manual unsafe treatment.
+-- Key outputs: :required_extensions_comment, :unsafe_type_aliases
+-- ============================================================================
 
 -- Extension/unsafe-type support: emit UnsafePGType aliases only when referenced.
 create temporary view sg_used_base_types as
@@ -209,6 +228,11 @@ from unsafe_types \gset
 \echo :unsafe_type_aliases
 \echo
 
+-- ============================================================================
+-- SECTION: DB and Schema Type Declarations
+-- Emit the top-level DB type and Schema composition type.
+-- ============================================================================
+
 select format('type DB = ''["%s" ::: Schema]', :'primary_schema') as db \gset
 \echo
 \echo :db
@@ -217,6 +241,13 @@ select format('type DB = ''["%s" ::: Schema]', :'primary_schema') as db \gset
 \echo type Schema = Join Tables (Join Views (Join Enums (Join Functions (Join Composites Domains))))
 \echo -- Trigger contract: Triggers is generated metadata and is not composed into Schema.
 
+
+-- ============================================================================
+-- SECTION: Enumerations
+-- Generate PGenum type definitions for enum types actually used by the schema.
+-- The used_enums CTE finds enums referenced in tables, views, functions, and
+-- composites, then we emit only those definitions to avoid unused clutter.
+-- ============================================================================
 
 -- now we emit all the enumerations
 -- Determine only the enums actually used by the chosen schema (including arrays and function args/returns)
@@ -288,6 +319,11 @@ from enumerations \gset
 \echo -- decls
 \echo :decl
 
+-- ============================================================================
+-- SECTION: Composites
+-- Generate PGcomposite type definitions for composite types in the schema.
+-- ============================================================================
+
 with composites as (select
   format(E'type PG%s = ''PGcomposite ''[%s]', t.typname,
     string_agg(
@@ -325,7 +361,12 @@ from composites \gset
 
 \echo
 
-
+-- ============================================================================
+-- SECTION: Tables (Columns and Constraints)
+-- Generate column definitions and constraint definitions for all tables.
+-- Handles: regular columns, system OID columns for catalogs, primary keys,
+-- foreign keys, unique constraints, and check constraints.
+-- ============================================================================
 
 create temporary view columnDefs as (SELECT tables.table_name,
              format(E'''[%s]',string_agg(mycolumns.colDef, E'\n  ,' order by mycolumns.ordinal_position)
@@ -344,7 +385,9 @@ join (
               when 'NO'  then '''NotNull'
               else pg_temp.croak ('is_nullable broken somehow: ' || is_nullable)
             end),
-           -- nb: we are assuming the inner array may be nullable. this may not be true, TODO
+           -- Note: type_decl_from is called with nullable=false here, which means array elements
+          -- are treated as NotNull. PostgreSQL arrays can have NULL elements, but Squeal's
+          -- type system doesn't distinguish these cases, so we use a conservative default.
            pg_temp.type_decl_from(data_type, udt_name, domain_name, false, character_maximum_length)
          ) as colDef
   from columns
@@ -499,6 +542,11 @@ order by defs.table_name COLLATE "C") allDefs \gset
 
 \echo -- VIEWS
 
+-- ============================================================================
+-- SECTION: Views
+-- Generate view type definitions. Views are emitted row-by-row to avoid
+-- oversized psql variables.
+-- ============================================================================
 
 create temporary view my_views as (
 SELECT
@@ -539,6 +587,21 @@ select format( E'%3$stype %1$sView = \n  ''[%2$s]\n'
   from my_views
  order by viewname COLLATE "C";
 \pset tuples_only off
+
+-- ============================================================================
+-- SECTION: Functions
+-- Generate function and procedure type definitions with overload handling.
+--
+-- Function Generation Contract:
+-- - Regular functions: "name" ::: Function '[args] :=> Returns (Null type)
+-- - Set-returning functions: "name" ::: Function '[args] :=> ReturnsTable '[cols]
+-- - Procedures: "name" ::: Procedure '[args]
+--
+-- Overload handling:
+-- - Overloaded functions get disambiguated labels: name__arg1type__arg2type
+-- - If only one overload is representable, a compatibility alias is emitted
+-- - Functions with pseudotype args/returns are omitted with a comment
+-- ============================================================================
 
 \echo -- functions
 
@@ -775,6 +838,12 @@ select case
    and funcs.proretset \gset
 \echo :omitted_srf_signatures
 
+-- ============================================================================
+-- SECTION: Domains
+-- Generate domain type definitions. Domain check constraints are emitted
+-- as Haddock notes only (not representable in Squeal types).
+-- ============================================================================
+
 SELECT format('type Domains = ''[%s]',
 	 coalesce(string_agg(format(E'"%s" ::: ''Typedef PG%s',
 					   pg_type.typname, p2.typname  ),
@@ -820,6 +889,13 @@ from (
     and dn.nspname = :'primary_schema'
 ) fallback_checks \gset
 \echo :omitted_fallback_check_constraints
+
+-- ============================================================================
+-- SECTION: Triggers
+-- Generate trigger metadata. Triggers are NOT composed into Schema; they are
+-- emitted as a separate Triggers type for reference/metadata purposes only.
+-- Trigger definitions are captured via pg_get_triggerdef when available.
+-- ============================================================================
 
 create temporary view triggerDefs as (
   select t.oid as tgoid,
