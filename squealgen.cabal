@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7e720616e420d16e4e254f628ae80f650b18f3503edc4ce5487d61982e397e27
+-- hash: 28b09601cf66103c6ae2d07a3cdc890776b1cbbab2b430c94951e3426dda6abc
 
 name:           squealgen
-version:        2.0.0
+version:        0.2.0.0
 synopsis:       generate squeal types from an existing database
 description:    Please see the README on GitHub at <https://github.com/mwotton/squealgen#readme>
 category:       Database

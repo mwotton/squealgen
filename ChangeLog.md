@@ -1,6 +1,6 @@
 # Changelog for squealgen
 
-## 2.0.0 (2026-02-16)
+## 0.2.0.0 (2026-02-16)
 
 ### Breaking Changes
 

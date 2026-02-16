@@ -10,7 +10,7 @@ MODULENAME=$2
 SCHEMA=$3
 IMPORTS=$4 # this can be empty.
 PSQLCMD=${PSQLCMD:-psql}
-version='2.0.0'
+version='0.2.0.0'
 $PSQLCMD -X -d "${DBNAME}" -v chosen_schema="${SCHEMA}" -v modulename="${MODULENAME}" -v extra_imports="${IMPORTS}" -v squealgen_version="${version}" <<"EOF"
 \set QUIET
 \set ON_ERROR_STOP true

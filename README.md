@@ -4,11 +4,11 @@ Generate squeal types from a running database.
 
 ![CI](https://github.com/mwotton/squealgen/actions/workflows/ci.yml/badge.svg)
 
-## Breaking Changes (v2.0.0)
+## Breaking Changes (v0.2.0.0)
 
 ### Overloaded Function Naming
 
-Starting with v2.0.0, overloaded PostgreSQL functions now use **disambiguated labels** to ensure type-safe calling:
+Starting with v0.2.0.0, overloaded PostgreSQL functions now use **disambiguated labels** to ensure type-safe calling:
 
 ```haskell
 -- Old (v1.x): Only one overload could be represented, using simple name
