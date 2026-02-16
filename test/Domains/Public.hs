@@ -3,7 +3,7 @@
 -- | Generation parameters:
 -- | Schema: public
 -- | Module: Domains.Public
--- | Version: 2.0.0
+-- | Version: 0.2.0.0
 -- |
 -- | Edit if you know how it got made and are willing to own it now.
 {-# LANGUAGE DataKinds #-}
