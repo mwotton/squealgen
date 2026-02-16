@@ -27,6 +27,8 @@ module Property.DDLSpec
   , SchemaDDL (..)
   , checkSchema
   , compileModule
+  , largeSchema
+  , compileLargeSchemaWithin
   ) where
 
 import           Control.Exception        (SomeException, displayException, try)

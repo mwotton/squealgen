@@ -65,6 +65,7 @@ type AccountViewView =
 -- functions
 type Functions = 
   '[  ]
+
 -- Omitted function signatures:
 --   account_view_iou(noargs): pseudotype return is not representable
 --   check_balance_not_negative(noargs): pseudotype return is not representable

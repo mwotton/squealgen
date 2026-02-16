@@ -1,3 +1,11 @@
+-- Regression test for FK referenced-column ordering bug.
+--
+-- The child_composite FK intentionally has column order MISMATCH between
+-- local columns (local_b, local_a) and referenced columns (ref_b, ref_a).
+-- This tests that squealgen correctly uses confkey (referenced) not conkey
+-- (local) when extracting FK target column order. A buggy implementation
+-- would emit ['local_b','local_a'] as target columns instead of ['ref_b','ref_a'].
+
 CREATE SCHEMA ref;
 
 CREATE TABLE public.parent_single (

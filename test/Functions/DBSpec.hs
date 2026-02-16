@@ -114,6 +114,9 @@ spec = describe "Functions" $ do
         hs `shouldContain` "--   legacy_alias(anyelement): pseudotype argument is not representable"
         hs `shouldContain` "--   inout_params(int8): pseudotype return is not representable"
         hs `shouldContain` "--   srf_any(anyelement): set-returning pseudotype return is not representable"
+        -- Verify overloaded warning is emitted when multiple representable overloads exist
+        hs `shouldContain` "-- Overloaded functions with multiple representable signatures:"
+        hs `shouldContain` "overloaded has 2 representable overloads"
   it "disambiguates overloaded labels when arg type names collide across schemas" $ do
     hs <- runCrossSchemaOverloadGenerator
     hs `shouldContain` "\"cross_schema_overloaded__one_dup_input\" ::: Function ('[ Null PGdup_input ] :=> 'Returns ( 'Null PGint8) )"

@@ -56,6 +56,7 @@ type Views =
 -- functions
 type Functions = 
   '[ "path_depth" ::: Function ('[ NotNull PGltree ] :=> 'Returns ( 'Null PGint4) ) ]
+
 -- Omitted function signatures: none
 -- Omitted SRF signatures: none
 type Domains = '[]

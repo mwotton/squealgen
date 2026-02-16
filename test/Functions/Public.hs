@@ -68,6 +68,9 @@ type Functions =
    , "srf_table" ::: Function ('[ Null PGint8 ] :=> 'ReturnsTable '["out_num" ::: 'Null PGint8,"out_text" ::: 'Null PGtext])
    , "strict_doubler" ::: Function ('[ NotNull PGint8 ] :=> 'Returns ( 'Null PGint8) )
    , "zero_arg" ::: Function ('[  ] :=> 'Returns ( 'Null PGint8) ) ]
+
+-- Overloaded functions with multiple representable signatures:
+--   overloaded has 2 representable overloads - use disambiguated labels
 -- Omitted function signatures:
 --   inout_params(int8): pseudotype return is not representable
 --   legacy_alias(anyelement): pseudotype argument is not representable

@@ -53,6 +53,7 @@ type Views =
 -- functions
 type Functions = 
   '[ "increment_positive" ::: Function ('[ NotNull PGpositive ] :=> 'Returns ( 'Null PGpositive) ) ]
+
 -- Omitted function signatures: none
 -- Omitted SRF signatures: none
 type Domains = '["positive" ::: 'Typedef PGint8]

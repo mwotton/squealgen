@@ -104,11 +104,22 @@ select set_config('search_path', :'safe_search_path', false) \gset
 \echo -- | 
 \echo -- | Edit if you know how it got made and are willing to own it now.
 
+-- Convert PostgreSQL type metadata to a Squeal type expression.
+--
+-- Parameters:
+--   data_type   - Type category from information_schema ('ARRAY', 'USER-DEFINED', etc.)
+--   udt_name    - Underlying type name from pg_type (e.g., '_int4' for int4[])
+--   domain_name - Domain type name if applicable, else NULL
+--   nullable    - Whether the type is nullable (affects Null/NotNull wrapper)
+--   fieldlen    - Character maximum length for varchar types, else NULL
+--
+-- Notes:
+--   - Sources data from both information_schema and pg_type for compatibility
+--   - varchar without length constraint maps to PGtext for simplicity
+--   - Array element nullability uses a conservative NotNull default
 create or replace function pg_temp.type_decl_from(data_type text, udt_name text, domain_name text, nullable bool, fieldlen cardinal_number) RETURNS text as $$
   select
   (case
-	-- this is pretty bad - we source the datatypes from the information_schema and also the basic tables (pg_type).
-	-- probably better to move it to just the basic tables.
     when (data_type = 'ARRAY' or data_type = 'A') then
       format('(PGvararray (%s %s))'
 	    , case when nullable then 'Null' else 'NotNull' end
@@ -118,8 +129,6 @@ create or replace function pg_temp.type_decl_from(data_type text, udt_name text,
 	      end)
     else
       (case
-	 -- this won't work for everything - should check if it's got a max length.
-	 --                    when udt_name = 'varchar' then 'PGtext'
 	 when udt_name = 'varchar' and fieldlen is null then 'PGtext'
 	 when udt_name = 'varchar' then format('(PGvarchar %s)', fieldlen)
 	 else ('PG' || (coalesce(domain_name, udt_name) :: text))
@@ -270,15 +279,14 @@ from extnames \gset
 \echo :required_extensions_comment
 
 with manual_unsafe_types as (
-  -- Special types (typcategory = 'S') that require UnsafePGType aliases.
-  -- This includes types like 'name', 'regclass', 'cidr', etc. that are
-  -- built into PostgreSQL but not mapped by Squeal's type system.
-  -- We query pg_type for special types that are actually used by the schema.
+  -- Types that require UnsafePGType aliases because Squeal doesn't map them natively.
+  -- This is a curated list of types that are commonly needed but not in Squeal's PG type family.
+  -- Note: Extension-owned types (ltree, etc.) are handled separately via pg_depend.
   select distinct t.typname
   from pg_catalog.pg_type t
   join pg_catalog.pg_namespace ns on ns.oid = t.typnamespace
-  where t.typcategory = 'S'
-    and ns.nspname = 'pg_catalog'
+  where ns.nspname = 'pg_catalog'
+    and t.typname in ('name', 'regclass', 'regtype', 'regproc', 'regprocedure', 'regoper', 'regoperator', 'regclass', 'regnamespace', 'regconfig', 'regdictionary')
 ), unsafe_types as (
   select distinct t.typname
   from sg_used_base_types t
@@ -465,6 +473,24 @@ create temporary view tableComments as (
 );
 
 
+-- Constraint metadata view for all constraint types we handle.
+--
+-- Columns:
+--   conoid      - Constraint OID (for stable ordering)
+--   conname     - Constraint name
+--   contype     - Constraint type: 'p' (primary key), 'f' (foreign key),
+--                 'u' (unique), 'c' (check)
+--   nsp         - Schema name containing the constraint
+--   table_name  - Table the constraint is defined on
+--   cols        - Local column names (array, ordered by conkey position)
+--   fnsp        - Referenced schema for FKs (null otherwise)
+--   ftab        - Referenced table for FKs (null otherwise)
+--   fcols       - Referenced column names for FKs (array, ordered by confkey position)
+--   condef      - Human-readable constraint definition via pg_get_constraintdef
+--
+-- Note: fcols uses confkey (referenced columns), NOT conkey (local columns).
+-- This was a bug fix: the original code used conkey which gave wrong ordering
+-- when FK columns were in different order than PK columns.
 create temporary view constraintDefs as (
 SELECT
   con.oid AS conoid,
@@ -834,6 +860,29 @@ from (
      and funcs.compatibility_alias is not null
 ) entries \gset
 \echo :functions
+
+-- Emit warning note if any function has multiple representable overloads.
+-- Callers must use disambiguated labels (name__argtype) in these cases.
+-- Note: We detect overloads by counting how many distinct labels share the same proname.
+with overload_stats as (
+  select proname,
+         count(*) as representable_count
+    from my_functions
+   where omission_reason is null
+   group by proname
+   having count(*) > 1
+)
+select case
+         when count(*) = 0 then ''
+         else E'\n-- Overloaded functions with multiple representable signatures:\n'
+              || string_agg(
+                   format(E'--   %s has %s representable overloads - use disambiguated labels',
+                     os.proname,
+                     os.representable_count),
+                   E'\n' order by (os.proname :: text) COLLATE "C")
+       end as overloaded_warning
+  from overload_stats os \gset
+\echo :overloaded_warning
 
 select case
          when count(*) = 0 then '-- Omitted function signatures: none'

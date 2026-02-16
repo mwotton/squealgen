@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Check that the squealgen script matches squealgen.sql.
+#
+# Modes (via SQUEALGEN_DRIFT_MODE):
+#   auto    - detect git worktree, use git mode if available (default)
+#   git     - require git worktree, compare against committed artifact
+#   non-git - compare against existing squealgen file (for tarball builds)
+#
+# Exit codes:
+#   0 - no drift detected (or first run in non-git mode with no existing artifact)
+#   1 - drift detected
+#   2 - usage error
+#
+# Note: In non-git mode, if squealgen doesn't exist, it's created and we exit 0.
+# This allows first-time setup from a source tarball without drift errors.
+
 drift_mode="${SQUEALGEN_DRIFT_MODE:-auto}"
 case "$drift_mode" in
   auto|git|non-git) ;;
